@@ -1,0 +1,10 @@
+[package]
+name = "eventparser"
+version = "0.1.0"
+authors = ["Isaac Lee <isaacrlee@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+chrono = "0.4"
+icalendar = "0.6.0"
+regex = "1"
