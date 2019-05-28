@@ -1,0 +1,26 @@
+language: rust
+dist: trusty
+
+branches:
+  except:
+    - master
+
+rust:
+  - stable
+
+cache: cargo
+
+before_script:
+  - |
+    when () {
+        if [ "$1" = "$TRAVIS_RUST_VERSION" ]; then
+            shift; "$@"
+        fi
+    }
+  - when stable rustup component add clippy
+
+script:
+  - when stable cargo build
+  - when stable cargo test
+  - when stable cargo clippy --tests --examples
+  - when nightly cargo bench
