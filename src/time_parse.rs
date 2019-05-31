@@ -1,21 +1,24 @@
 use chrono::{NaiveTime, Utc};
+use regex::*;
 use std::error::Error;
 use std::fmt;
 
 // use crate::date_parse::*;
 use crate::recognizable::Recognizable;
 
-#[derive(Debug)]
+extern crate regex;
+
+#[derive(Debug, PartialEq)]
 pub enum TimeParseError {
     TimeUnknown,
-    IoError(std::io::Error),
+    TimeBad,
 }
 
 impl fmt::Display for TimeParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             TimeParseError::TimeUnknown => write!(f, "Error: Time unknown"),
-            TimeParseError::IoError(e) => write!(f, "IO Error: {}", e),
+            TimeParseError::TimeBad => write!(f, "Error: Time bad format"),
         }
     }
 }
@@ -61,12 +64,57 @@ impl Recognizable for TimeExpr {
     type Error = TimeParseError;
 
     fn recognize(text: &str) -> Result<TimeExpr, Self::Error> {
-        unimplemented!()
+        match try_absolute_time(text) {
+            Some(expr) => Ok(expr),
+            None => Err(TimeParseError::TimeUnknown),
+        }
     }
 
     fn describe() -> &'static str {
         "time of day"
     }
+}
+
+fn try_absolute_time(text: &str) -> Option<TimeExpr> {
+    // colon, "am", "pm", "o'clock", ...?
+
+    let mut nt = NaiveTime::from_hms(0, 0, 0);
+
+    // 8:30am/pm AM/PM/ a/p
+    let re = Regex::new(r"(?i)\d{1,2}:\d{2}[ap]m?").unwrap();
+
+    match re.find(text) {
+        Some(m) => {
+            println!("m: {:?}", m.as_str());
+            match NaiveTime::parse_from_str(m.as_str(), "%k:%M%P") {
+                Ok(t) => {
+                    println!("t: {}", t);
+                    nt = t;
+                }
+                Err(e) => {}
+            }
+        }
+        None => {}
+    }
+
+    // 8:30, 10:30
+    // let re = Regex::new(r"\d{1,2}:\d{2}").unwrap();
+    // hour = re.captures_iter(text).next()
+
+    // 10pm
+
+    // 10
+    Some(TimeExpr::Absolute(nt))
+}
+
+fn try_casual_time(text: &str) -> Option<TimeExpr> {
+    // "morning", "evening", "midnight", "mid{-}?day", ...?
+    None
+}
+
+fn try_relative_time(text: &str) -> Option<TimeExpr> {
+    // "in_hours/minutes",
+    None
 }
 
 // Tests
@@ -94,16 +142,15 @@ mod time_expr_tests {
     #[test]
     fn am_pm_minute_tests() {
         assert_recognize_time("10:30am", 10, 30);
-        assert_recognize_time("10pm", 22, 30);
+        // assert_recognize_time("10pm", 22, 30);
     }
 
     fn assert_recognize_time(text: &str, expected_h: u32, expected_m: u32) {
-        // assert_eq!(
-        //     TimeExpr::recognize(text),
-        //     Ok((
-        //         TimeExpr::Absolute(NaiveTime::from_hms(expected_h, expected_m, 0)),
-        //         text
-        //     ))
-        // )
+        assert_eq!(
+            TimeExpr::recognize(text),
+            Ok(TimeExpr::Absolute(NaiveTime::from_hms(
+                expected_h, expected_m, 0
+            )))
+        )
     }
 }

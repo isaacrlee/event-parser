@@ -4,17 +4,17 @@ use std::fmt;
 
 use crate::recognizable::Recognizable;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum DateParseError {
     DateUnknown,
-    IoError(std::io::Error),
+    DateBad,
 }
 
 impl fmt::Display for DateParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             DateParseError::DateUnknown => write!(f, "Error: Date unknown"),
-            DateParseError::IoError(e) => write!(f, "IO Error: {}", e),
+            DateParseError::DateBad => write!(f, "Error: Date bad format"),
         }
     }
 }
