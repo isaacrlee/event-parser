@@ -29,11 +29,6 @@ enum EventStartAndEndExpr {
     AllDayStartsAndEnds(NaiveDate, NaiveDate),
 }
 
-// struct 'a T> {
-//     result: T,
-//     rest: &'a str,
-// }
-
 // Parse Function
 
 /// Parses input string into Event

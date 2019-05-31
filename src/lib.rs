@@ -1,34 +1,47 @@
 use chrono::{DateTime, Duration, NaiveDate, NaiveTime, Utc};
 use regex::RegexSet;
+use std::error::Error;
 use std::fmt;
 
 #[derive(Debug)]
 pub enum DateParseError {
-    DateBadFormat,
+    DateUnknown,
     IoError(std::io::Error),
 }
 
 impl fmt::Display for DateParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            DateParseError::DateBadFormat => write!(f, "Error: Date not formatted correctly"),
+            DateParseError::DateUnknown => write!(f, "Error: Date unknown"),
             DateParseError::IoError(e) => write!(f, "IO Error: {}", e),
         }
     }
 }
 
+impl Error for DateParseError {
+    fn description(&self) -> &str {
+        "Date unknown"
+    }
+}
+
 #[derive(Debug)]
 pub enum TimeParseError {
-    TimeBadFormat,
+    TimeUnknown,
     IoError(std::io::Error),
 }
 
 impl fmt::Display for TimeParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            TimeParseError::TimeBadFormat => write!(f, "Error: Time not formatted correctly"),
+            TimeParseError::TimeUnknown => write!(f, "Error: Time unknown"),
             TimeParseError::IoError(e) => write!(f, "IO Error: {}", e),
         }
+    }
+}
+
+impl Error for TimeParseError {
+    fn description(&self) -> &str {
+        "Time unknown"
     }
 }
 
@@ -38,25 +51,6 @@ impl fmt::Display for TimeParseError {
 // {tonight, last night, tomorrow night, tomorrow morning, lunch, dinner, breakfast, dawn, late, afternoon, evening, now, in two hours, midnight}
 
 // Parser
-
-// DateTime Parser
-
-/// Contains parsing options.
-// pub struct DateTimeParser {}
-
-// impl DateTimeParser {
-//     pub fn parse(&self, text: &str) -> Result<DateTime<Utc>, DateTimeParseError> {
-//         self.parse_relative(text, Some(&Utc::now()))
-//     }
-
-//     pub fn parse_relative(
-//         &self,
-//         text: &str,
-//         now: Option<&DateTime<Utc>>,
-//     ) -> Result<DateTime<Utc>, DateTimeParseError> {
-//         unimplemented!()
-//     }
-// }
 
 // Date Parser
 pub struct DateParser {}
@@ -202,13 +196,17 @@ enum TimeExpr {
 
 /// Trait for types that can be parsed.
 trait Recognizable: Sized {
-    fn recognize(text: &str) -> Option<(Self, &str)>;
+    type Error: std::error::Error;
+
+    fn recognize(text: &str) -> Result<Self, Self::Error>;
 
     fn describe() -> &'static str;
 }
 
 impl Recognizable for YearExpr {
-    fn recognize(text: &str) -> Option<(YearExpr, &str)> {
+    type Error = DateParseError;
+
+    fn recognize(text: &str) -> Result<YearExpr, Self::Error> {
         unimplemented!()
     }
 
@@ -218,7 +216,9 @@ impl Recognizable for YearExpr {
 }
 
 impl Recognizable for MonthExpr {
-    fn recognize(text: &str) -> Option<(MonthExpr, &str)> {
+    type Error = DateParseError;
+
+    fn recognize(text: &str) -> Result<MonthExpr, Self::Error> {
         unimplemented!()
     }
 
@@ -228,7 +228,9 @@ impl Recognizable for MonthExpr {
 }
 
 impl Recognizable for WeekExpr {
-    fn recognize(text: &str) -> Option<(WeekExpr, &str)> {
+    type Error = DateParseError;
+
+    fn recognize(text: &str) -> Result<WeekExpr, Self::Error> {
         unimplemented!()
     }
 
@@ -238,7 +240,9 @@ impl Recognizable for WeekExpr {
 }
 
 impl Recognizable for DateExpr {
-    fn recognize(text: &str) -> Option<(DateExpr, &str)> {
+    type Error = DateParseError;
+
+    fn recognize(text: &str) -> Result<DateExpr, Self::Error> {
         unimplemented!()
     }
 
@@ -249,7 +253,9 @@ impl Recognizable for DateExpr {
 
 // https://github.com/wanasit/chrono/blob/master/src/parsers/en/ENTimeExpressionParser.js
 impl Recognizable for TimeExpr {
-    fn recognize(text: &str) -> Option<(TimeExpr, &str)> {
+    type Error = TimeParseError;
+
+    fn recognize(text: &str) -> Result<TimeExpr, Self::Error> {
         unimplemented!()
     }
 
@@ -298,9 +304,3 @@ mod time_expr_tests {
 }
 
 // Fuzzy Helpers?
-
-// /// Returns true if and only if the text matches the pattern.
-// fn is_match_helper(text: &str, patterns: &[&str]) -> bool {
-//     let re = RegexSet::new(patterns).expect("Invalid Patterns");
-//     re.is_match(text)
-// }
