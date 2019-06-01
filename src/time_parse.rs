@@ -78,33 +78,71 @@ impl Recognizable for TimeExpr {
 fn try_absolute_time(text: &str) -> Option<TimeExpr> {
     // colon, "am", "pm", "o'clock", ...?
 
-    let mut nt = NaiveTime::from_hms(0, 0, 0);
-
-    // 8:30am/pm AM/PM/ a/p
+    // 10:30am/pm AM/PM a/p A/P
     let re = Regex::new(r"(?i)\d{1,2}:\d{2}[ap]m?").unwrap();
 
-    match re.find(text) {
-        Some(m) => {
-            println!("m: {:?}", m.as_str());
-            match NaiveTime::parse_from_str(m.as_str(), "%k:%M%P") {
-                Ok(t) => {
-                    println!("t: {}", t);
-                    nt = t;
-                }
-                Err(e) => {}
-            }
+    if let Some(time) = re.find(text) {
+        let mut time_str = time.as_str().to_lowercase();
+
+        if !time_str.ends_with("m") {
+            time_str.push('m');
         }
-        None => {}
+        if let Ok(nt) = NaiveTime::parse_from_str(&time_str, "%l:%M%P") {
+            return Some(TimeExpr::Absolute(nt));
+        };
     }
 
-    // 8:30, 10:30
-    // let re = Regex::new(r"\d{1,2}:\d{2}").unwrap();
-    // hour = re.captures_iter(text).next()
+    // 10:30
+    let re = Regex::new(r"\d{1,2}:\d{2}").unwrap();
 
-    // 10pm
+    if let Some(time) = re.find(text) {
+        let time_str = time.as_str().to_lowercase();
+
+        if let Ok(nt) = NaiveTime::parse_from_str(&time_str, "%k:%M") {
+            return Some(TimeExpr::Absolute(nt));
+        }
+    }
+
+    // 10pm/am a/p
+    let re = Regex::new(r"(?i)\d{2}[ap]m?").unwrap();
+
+    if let Some(time) = re.find(text) {
+        let mut time_str = time.as_str().to_lowercase();
+
+        let (hour, pm) = time_str.split_at(2);
+        let mut hour: u32 = hour.parse().unwrap();
+        if pm.contains("p") {
+            hour += 12;
+        }
+        return Some(TimeExpr::Absolute(NaiveTime::from_hms(hour, 0, 0)));
+    }
+
+    // 2pm
+    let re = Regex::new(r"(?i)\d{1}[ap]m?").unwrap();
+
+    if let Some(time) = re.find(text) {
+        let mut time_str = time.as_str().to_lowercase();
+
+        let (hour, pm) = time_str.split_at(1);
+        let mut hour: u32 = hour.parse().unwrap();
+        if pm.contains("p") {
+            hour += 12;
+        }
+        return Some(TimeExpr::Absolute(NaiveTime::from_hms(hour, 0, 0)));
+    }
 
     // 10
-    Some(TimeExpr::Absolute(nt))
+    let re = Regex::new(r"\d{1,2}").unwrap();
+
+    if let Some(time) = re.find(text) {
+        let mut hour: u32 = time.as_str().parse().unwrap();
+        if hour < 8 && !hour > 12 {
+            hour += 12;
+        }
+        return Some(TimeExpr::Absolute(NaiveTime::from_hms(hour, 0, 0)));
+    }
+
+    None
 }
 
 fn try_casual_time(text: &str) -> Option<TimeExpr> {
@@ -126,22 +164,32 @@ mod time_expr_tests {
     #[test]
     fn simple_hour_tests() {
         assert_recognize_time("12", 12, 0);
+        assert_recognize_time("2", 14, 0);
+        assert_recognize_time("10", 10, 0);
+        assert_recognize_time("5", 17, 0);
     }
 
     #[test]
     fn am_pm_hour_tests() {
         assert_recognize_time("10am", 10, 0);
         assert_recognize_time("10pm", 22, 0);
+        assert_recognize_time("2p", 14, 0);
     }
 
     #[test]
     fn simple_minute_tests() {
         assert_recognize_time("12:30", 12, 30);
+        assert_recognize_time("2:30", 2, 30);
     }
 
     #[test]
     fn am_pm_minute_tests() {
         assert_recognize_time("10:30am", 10, 30);
+        assert_recognize_time("2:30pm", 14, 30);
+        assert_recognize_time("10:30AM", 10, 30);
+        assert_recognize_time("2:30PM", 14, 30);
+        assert_recognize_time("10:30a", 10, 30);
+        assert_recognize_time("2:30p", 14, 30);
         // assert_recognize_time("10pm", 22, 30);
     }
 
