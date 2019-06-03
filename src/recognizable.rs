@@ -11,7 +11,7 @@
 pub trait Recognizable: Sized {
     type Error: std::error::Error;
 
-    fn recognize(text: &str) -> Result<Self, Self::Error>;
+    fn recognize(text: &str) -> Result<Option<Self>, Self::Error>;
 
     fn describe() -> &'static str;
 }

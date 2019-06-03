@@ -1,15 +1,20 @@
-// use std::io;
-// use std::io::prelude::*;
-use chrono::{DateTime, Local, NaiveDate, NaiveDateTime, NaiveTime, Utc};
+use chrono::{DateTime, Local, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use icalendar::{Component, Event};
+use std::io;
+use std::io::prelude::*;
 // use regex::Regex;
+use eventparser::date_parse::DateParser;
+use eventparser::time_parse::TimeParser;
+
+// TODO: Generic Read/Write
 
 fn main() {
-    println!("Hello World");
-    // let stdin = io::stdin();
-    // for line in stdin.lock().lines() {
-    //     parse_input(line.unwrap());
-    // }
+    println!("e.g. Lunch at 12pm");
+    let stdin = std::io::stdin();
+    for line in stdin.lock().lines() {
+        let event = parse_input(&line.unwrap());
+        println!("{:?}", event);
+    }
 }
 
 // Examples
@@ -21,6 +26,7 @@ fn main() {
 // Structs
 /// Abstract expression for the start and end of an event.
 enum EventStartAndEndExpr {
+    Unknown,
     Starts(NaiveTime),
     StartsAndEnds(NaiveTime, NaiveTime),
     StartsWithDate(NaiveTime, NaiveDate),
@@ -37,21 +43,27 @@ pub fn parse_input(text: &str) -> Event {
 
     let mut e = Event::new();
 
-    let now = chrono::Local::now();
-    let today = chrono::Local::today();
+    let now = Local::now();
+    let today = Local::today();
 
     // start time/date and end time/date
-    if let Some(exp) = get_start_and_end(text) {
-        use EventStartAndEndExpr::*;
-        match exp {
-            Starts(t) => {
-                // check if parsed time is later than current time, if so, set default day to tomorrow, otherwise, default to today
+    let expr = get_start_and_end(text);
 
-                let ndt = NaiveDateTime::new(today.naive_utc(), t);
-                // e.starts(DateTime::<Local>::from_utc(ndt, Local));
-            } // ...
-            _ => {}
+    // use EventStartAndEndExpr::*;
+
+    match expr {
+        EventStartAndEndExpr::Unknown => {
+            e.all_day(today);
         }
+        EventStartAndEndExpr::Starts(t) => {
+            // TODO: check if time is later than now => set day to tomorrow, else, set day to today
+            // default to today
+            let ndt = NaiveDateTime::new(today.naive_utc(), t);
+            let dt = DateTime::<Utc>::from_utc(ndt, Utc); // TODO: Local
+            println!("dt: {}", dt);
+            e.starts(dt);
+        }
+        _ => {}
     }
 
     // location
@@ -68,14 +80,20 @@ pub fn parse_input(text: &str) -> Event {
 }
 
 /// Returns an `Option` containing an `EventStartAndEndExpr`.
-fn get_start_and_end(input: &str) -> Option<EventStartAndEndExpr> {
-    unimplemented!()
+fn get_start_and_end(text: &str) -> EventStartAndEndExpr {
     // Hack: look for {'-', "to"}, if found, then it's a StartsAndEnds, StartsAndEndsWithDate, or AllDayStartsAndEnds
     //  Get expressions before and after {'-', "to"}
-    // else parse input for Start
-    //  Hack: search for {12am, midnight}, if not found, if 12am is returned, it's an AllDay, or AllDayStartsAndEnds
-    //  else it's a Starts
-    // if not found, default to now
+
+    if let Some(start_time) = TimeParser::parse(text).unwrap() {
+        // if let Some(start_date) = DateParser::parse(text).unwrap() {
+        //     return EventStartAndEndExpr::StartsWithDate(start_time, start_date);
+        // }
+        return EventStartAndEndExpr::Starts(start_time);
+    }
+
+    // if let Some(start_date) = DateParser::parse(text).unwrap() {
+    //     return EventStartAndEndExpr::AllDay(start_date);
+    // }
 
     // Previous Time Parsing:
     // Looks for a start time and end time
@@ -88,14 +106,15 @@ fn get_start_and_end(input: &str) -> Option<EventStartAndEndExpr> {
 
     // Assume NOT all day event: look for date
     //  if no date exists, default to today
+    EventStartAndEndExpr::Unknown
 }
 
 /// Returns an `Option` containing an event's summary string parsed from `input`.
-fn get_summary(input: &str) -> Option<String> {
+fn get_summary(text: &str) -> Option<String> {
     Some("Example Summary".to_owned())
 }
 
 /// Returns an `Option` containing an event location string parsed from `input`.
-fn get_location(input: &str) -> Option<String> {
+fn get_location(text: &str) -> Option<String> {
     Some("Example Location".to_owned())
 }

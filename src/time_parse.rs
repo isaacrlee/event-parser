@@ -12,6 +12,7 @@ extern crate regex;
 pub enum TimeParseError {
     TimeUnknown,
     TimeBad,
+    //RegexError
 }
 
 impl fmt::Display for TimeParseError {
@@ -30,23 +31,30 @@ impl Error for TimeParseError {
 }
 
 // Time Parser
+#[derive(Default)]
 pub struct TimeParser {}
 
 impl TimeParser {
-    pub fn parse(&self, text: &str) -> Result<NaiveTime, TimeParseError> {
-        self.parse_relative(text, Some(&Utc::now().time()))
+    pub fn parse(text: &str) -> Result<Option<NaiveTime>, TimeParseError> {
+        TimeParser::parse_relative(text, Some(&Utc::now().time()))
     }
 
     pub fn parse_relative(
-        &self,
         text: &str,
         now: Option<&NaiveTime>,
-    ) -> Result<NaiveTime, TimeParseError> {
-        unimplemented!()
-        // TimeExpr.recognize(text)
+    ) -> Result<Option<NaiveTime>, TimeParseError> {
+        let time_opt = TimeExpr::recognize(text)?;
 
-        // match TimeExpr
-        // create NaiveTime based on DateExpr and now
+        match time_opt {
+            Some(expr) => match expr {
+                TimeExpr::Absolute(nt) => {
+                    return Ok(Some(nt));
+                }
+                _ => {}
+            },
+            None => return Ok(None),
+        }
+        Ok(None)
     }
 }
 
@@ -63,11 +71,8 @@ enum TimeExpr {
 impl Recognizable for TimeExpr {
     type Error = TimeParseError;
 
-    fn recognize(text: &str) -> Result<TimeExpr, Self::Error> {
-        match try_absolute_time(text) {
-            Some(expr) => Ok(expr),
-            None => Err(TimeParseError::TimeUnknown),
-        }
+    fn recognize(text: &str) -> Result<Option<TimeExpr>, Self::Error> {
+        try_absolute_time(text)
     }
 
     fn describe() -> &'static str {
@@ -75,7 +80,7 @@ impl Recognizable for TimeExpr {
     }
 }
 
-fn try_absolute_time(text: &str) -> Option<TimeExpr> {
+fn try_absolute_time(text: &str) -> Result<Option<TimeExpr>, TimeParseError> {
     // colon, "am", "pm", "o'clock", ...?
 
     // 10:30am/pm AM/PM a/p A/P
@@ -88,7 +93,7 @@ fn try_absolute_time(text: &str) -> Option<TimeExpr> {
             time_str.push('m');
         }
         if let Ok(nt) = NaiveTime::parse_from_str(&time_str, "%l:%M%P") {
-            return Some(TimeExpr::Absolute(nt));
+            return Ok(Some(TimeExpr::Absolute(nt)));
         };
     }
 
@@ -99,7 +104,7 @@ fn try_absolute_time(text: &str) -> Option<TimeExpr> {
         let time_str = time.as_str().to_lowercase();
 
         if let Ok(nt) = NaiveTime::parse_from_str(&time_str, "%k:%M") {
-            return Some(TimeExpr::Absolute(nt));
+            return Ok(Some(TimeExpr::Absolute(nt)));
         }
     }
 
@@ -111,10 +116,10 @@ fn try_absolute_time(text: &str) -> Option<TimeExpr> {
 
         let (hour, pm) = time_str.split_at(2);
         let mut hour: u32 = hour.parse().unwrap();
-        if pm.contains("p") {
+        if pm.contains("p") && hour != 12 {
             hour += 12;
         }
-        return Some(TimeExpr::Absolute(NaiveTime::from_hms(hour, 0, 0)));
+        return Ok(Some(TimeExpr::Absolute(NaiveTime::from_hms(hour, 0, 0))));
     }
 
     // 2pm
@@ -128,7 +133,7 @@ fn try_absolute_time(text: &str) -> Option<TimeExpr> {
         if pm.contains("p") {
             hour += 12;
         }
-        return Some(TimeExpr::Absolute(NaiveTime::from_hms(hour, 0, 0)));
+        return Ok(Some(TimeExpr::Absolute(NaiveTime::from_hms(hour, 0, 0))));
     }
 
     // 10
@@ -136,17 +141,18 @@ fn try_absolute_time(text: &str) -> Option<TimeExpr> {
 
     if let Some(time) = re.find(text) {
         let mut hour: u32 = time.as_str().parse().unwrap();
-        if hour < 8 && !hour > 12 {
+        if hour < 8 {
             hour += 12;
         }
-        return Some(TimeExpr::Absolute(NaiveTime::from_hms(hour, 0, 0)));
+        return Ok(Some(TimeExpr::Absolute(NaiveTime::from_hms(hour, 0, 0))));
     }
 
-    None
+    Ok(None)
 }
 
 fn try_casual_time(text: &str) -> Option<TimeExpr> {
     // "morning", "evening", "midnight", "mid{-}?day", ...?
+
     None
 }
 
@@ -173,6 +179,7 @@ mod time_expr_tests {
     fn am_pm_hour_tests() {
         assert_recognize_time("10am", 10, 0);
         assert_recognize_time("10pm", 22, 0);
+        assert_recognize_time("12pm", 12, 0);
         assert_recognize_time("2p", 14, 0);
     }
 
@@ -190,15 +197,25 @@ mod time_expr_tests {
         assert_recognize_time("2:30PM", 14, 30);
         assert_recognize_time("10:30a", 10, 30);
         assert_recognize_time("2:30p", 14, 30);
-        // assert_recognize_time("10pm", 22, 30);
+    }
+
+    #[test]
+
+    fn casual_time_tests() {
+        // assert_recognize_time("in the morning", 9, 0);
+        // assert_recognize_time("this afternoon", 14, 0);
+        // assert_recognize_time("in the evening", 18, 0);
+        // assert_recognize_time("tonight", 21, 0);
+        // assert_recognize_time("noon", 12, 0);
+        // assert_recognize_time("midnight", 0, 0);
     }
 
     fn assert_recognize_time(text: &str, expected_h: u32, expected_m: u32) {
         assert_eq!(
             TimeExpr::recognize(text),
-            Ok(TimeExpr::Absolute(NaiveTime::from_hms(
+            Ok(Some(TimeExpr::Absolute(NaiveTime::from_hms(
                 expected_h, expected_m, 0
-            )))
+            ))))
         )
     }
 }

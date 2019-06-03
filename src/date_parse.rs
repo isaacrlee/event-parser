@@ -29,15 +29,14 @@ impl Error for DateParseError {
 pub struct DateParser {}
 
 impl DateParser {
-    pub fn parse(&self, text: &str) -> Result<NaiveDate, DateParseError> {
-        self.parse_relative(text, Some(&Utc::now().date().naive_utc()))
+    pub fn parse(text: &str) -> Result<Option<NaiveDate>, DateParseError> {
+        DateParser::parse_relative(text, Some(&Utc::now().date().naive_utc()))
     }
 
     pub fn parse_relative(
-        &self,
         text: &str,
         now: Option<&NaiveDate>,
-    ) -> Result<NaiveDate, DateParseError> {
+    ) -> Result<Option<NaiveDate>, DateParseError> {
         unimplemented!()
         // DateExpr.recognize(text)
 
@@ -133,7 +132,7 @@ enum DateExpr {
 impl Recognizable for YearExpr {
     type Error = DateParseError;
 
-    fn recognize(text: &str) -> Result<YearExpr, Self::Error> {
+    fn recognize(text: &str) -> Result<Option<YearExpr>, Self::Error> {
         unimplemented!()
     }
 
@@ -145,7 +144,7 @@ impl Recognizable for YearExpr {
 impl Recognizable for MonthExpr {
     type Error = DateParseError;
 
-    fn recognize(text: &str) -> Result<MonthExpr, Self::Error> {
+    fn recognize(text: &str) -> Result<Option<MonthExpr>, Self::Error> {
         unimplemented!()
     }
 
@@ -157,7 +156,7 @@ impl Recognizable for MonthExpr {
 impl Recognizable for WeekExpr {
     type Error = DateParseError;
 
-    fn recognize(text: &str) -> Result<WeekExpr, Self::Error> {
+    fn recognize(text: &str) -> Result<Option<WeekExpr>, Self::Error> {
         unimplemented!()
     }
 
@@ -169,7 +168,7 @@ impl Recognizable for WeekExpr {
 impl Recognizable for DateExpr {
     type Error = DateParseError;
 
-    fn recognize(text: &str) -> Result<DateExpr, Self::Error> {
+    fn recognize(text: &str) -> Result<Option<DateExpr>, Self::Error> {
         unimplemented!()
     }
 
