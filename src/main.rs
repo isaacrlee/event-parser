@@ -7,7 +7,6 @@ use eventparser::date_parse::DateParser;
 use eventparser::time_parse::TimeParser;
 
 // TODO: Generic Read/Write
-
 fn main() {
     println!("e.g. Lunch at 12pm");
     let stdin = std::io::stdin();
@@ -35,9 +34,7 @@ enum EventStartAndEndExpr {
     AllDayStartsAndEnds(NaiveDate, NaiveDate),
 }
 
-// Parse Function
-
-/// Parses input string into Event
+/// Parses this string slice into an `Event`.
 pub fn parse_input(text: &str) -> Event {
     println!("Input: {}", text);
 
@@ -109,12 +106,12 @@ fn get_start_and_end(text: &str) -> EventStartAndEndExpr {
     EventStartAndEndExpr::Unknown
 }
 
-/// Returns an `Option` containing an event's summary string parsed from `input`.
+/// Returns an `Option` containing an event's summary string parsed from `text`.
 fn get_summary(text: &str) -> Option<String> {
     Some("Example Summary".to_owned())
 }
 
-/// Returns an `Option` containing an event location string parsed from `input`.
+/// Returns an `Option` containing an event location string parsed from `text `.
 fn get_location(text: &str) -> Option<String> {
     Some("Example Location".to_owned())
 }

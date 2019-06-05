@@ -30,8 +30,8 @@ impl Error for TimeParseError {
     }
 }
 
-// Time Parser
 #[derive(Default)]
+/// A date parser for string slices.
 pub struct TimeParser {}
 
 impl TimeParser {
@@ -59,6 +59,7 @@ impl TimeParser {
 }
 
 #[derive(Debug, PartialEq)]
+// An abstract syntax for parsing times.
 enum TimeExpr {
     Now,
     Absolute(NaiveTime),

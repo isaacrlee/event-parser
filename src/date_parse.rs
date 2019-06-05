@@ -5,16 +5,17 @@ use std::fmt;
 use crate::recognizable::Recognizable;
 
 #[derive(Debug, PartialEq)]
+/// The error type for date parsing.
 pub enum DateParseError {
     DateUnknown,
-    DateBad,
+    DateBad, // E.g. January 45th
 }
 
 impl fmt::Display for DateParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             DateParseError::DateUnknown => write!(f, "Error: Date unknown"),
-            DateParseError::DateBad => write!(f, "Error: Date bad format"),
+            DateParseError::DateBad => write!(f, "Error: Bad date"),
         }
     }
 }
@@ -25,7 +26,7 @@ impl Error for DateParseError {
     }
 }
 
-// Date Parser
+/// A date parser for string slices.
 pub struct DateParser {}
 
 impl DateParser {
@@ -45,7 +46,6 @@ impl DateParser {
     }
 }
 
-// Expressions
 #[derive(Debug, PartialEq)]
 /// 0 means 1 BC, -1 means 2 BC, etc.?
 struct Year(pub isize);
@@ -118,6 +118,7 @@ enum WeekExpr {
 }
 
 #[derive(Debug, PartialEq)]
+// An abstract syntax for parsing dates.
 enum DateExpr {
     Today,
     Absolute(NaiveDate),
