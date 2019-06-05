@@ -1,21 +1,24 @@
-use chrono::{DateTime, Local, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
-use icalendar::{Component, Event};
+use chrono::{Date, DateTime, Duration, Local, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
+use icalendar::{Component, Event, Property};
 use std::io;
 use std::io::prelude::*;
 // use regex::Regex;
 use eventparser::date_parse::DateParser;
 use eventparser::time_parse::TimeParser;
+use std::fmt;
 
 // TODO: Generic Read/Write
+
 fn main() {
     println!("e.g. Lunch at 12pm");
     let stdin = std::io::stdin();
     for line in stdin.lock().lines() {
         let event = parse_input(&line.unwrap());
-        println!("{:?}", event);
+        // println!("{:?}", event);
+        // pretty_print(event);
+        event.print();
     }
 }
-
 // Examples
 // Starts: Lunch (12pm, 12, noon, twelve, at 12}
 // AllDay: Dillo Day {Saturday, 6/1, sat, this saturday, next saturday, june 1, june 1st}
@@ -34,7 +37,9 @@ enum EventStartAndEndExpr {
     AllDayStartsAndEnds(NaiveDate, NaiveDate),
 }
 
-/// Parses this string slice into an `Event`.
+// Parse Function
+
+/// Parses input string into Event
 pub fn parse_input(text: &str) -> Event {
     println!("Input: {}", text);
 
@@ -57,8 +62,17 @@ pub fn parse_input(text: &str) -> Event {
             // default to today
             let ndt = NaiveDateTime::new(today.naive_utc(), t);
             let dt = DateTime::<Utc>::from_utc(ndt, Utc); // TODO: Local
-            println!("dt: {}", dt);
+                                                          // println!("dt: {}", dt);
             e.starts(dt);
+            let d = Duration::hours(1);
+            e.ends(dt.checked_add_signed(d).unwrap());
+        }
+        EventStartAndEndExpr::AllDay(d) => {
+            let date = Date::<Utc>::from_utc(d, Utc);
+            e.all_day(date);
+        }
+        EventStartAndEndExpr::StartsWithDate(time, d) => {
+            let date = Date::<Utc>::from_utc(d, Utc);
         }
         _ => {}
     }
@@ -82,15 +96,15 @@ fn get_start_and_end(text: &str) -> EventStartAndEndExpr {
     //  Get expressions before and after {'-', "to"}
 
     if let Some(start_time) = TimeParser::parse(text).unwrap() {
-        // if let Some(start_date) = DateParser::parse(text).unwrap() {
-        //     return EventStartAndEndExpr::StartsWithDate(start_time, start_date);
-        // }
+        if let Some(start_date) = DateParser::parse(text).unwrap() {
+            return EventStartAndEndExpr::StartsWithDate(start_time, start_date);
+        }
         return EventStartAndEndExpr::Starts(start_time);
     }
 
-    // if let Some(start_date) = DateParser::parse(text).unwrap() {
-    //     return EventStartAndEndExpr::AllDay(start_date);
-    // }
+    if let Some(start_date) = DateParser::parse(text).unwrap() {
+        return EventStartAndEndExpr::AllDay(start_date);
+    }
 
     // Previous Time Parsing:
     // Looks for a start time and end time
@@ -106,12 +120,32 @@ fn get_start_and_end(text: &str) -> EventStartAndEndExpr {
     EventStartAndEndExpr::Unknown
 }
 
-/// Returns an `Option` containing an event's summary string parsed from `text`.
+/// Returns an `Option` containing an event's summary string parsed from `input`.
 fn get_summary(text: &str) -> Option<String> {
     Some("Example Summary".to_owned())
 }
 
-/// Returns an `Option` containing an event location string parsed from `text `.
+/// Returns an `Option` containing an event location string parsed from `input`.
 fn get_location(text: &str) -> Option<String> {
     Some("Example Location".to_owned())
+}
+
+/// Pretty prints formatted `Event` to the standard output.
+fn pretty_print(e: Event) {
+    // if start exists
+    //  look for end
+
+    if let Some(summary) = e.properties().get("SUMMARY") {
+        println!("Event: {:?}", summary);
+    }
+
+    if let Some(loc) = e.properties().get("LOCATION") {
+        println!("Location: {:?}", loc);
+    }
+
+    if let Some(start) = e.properties().get("DTSTART") {
+        if let Some(end) = e.properties().get("DTEND") {
+            println!("Hello");
+        }
+    }
 }

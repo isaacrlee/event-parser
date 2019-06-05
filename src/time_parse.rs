@@ -36,12 +36,12 @@ pub struct TimeParser {}
 
 impl TimeParser {
     pub fn parse(text: &str) -> Result<Option<NaiveTime>, TimeParseError> {
-        TimeParser::parse_relative(text, Some(&Utc::now().time()))
+        TimeParser::parse_relative(text, &Utc::now().time())
     }
 
     pub fn parse_relative(
         text: &str,
-        now: Option<&NaiveTime>,
+        now: &NaiveTime,
     ) -> Result<Option<NaiveTime>, TimeParseError> {
         let time_opt = TimeExpr::recognize(text)?;
 
@@ -73,7 +73,7 @@ impl Recognizable for TimeExpr {
     type Error = TimeParseError;
 
     fn recognize(text: &str) -> Result<Option<TimeExpr>, Self::Error> {
-        try_absolute_time(text)
+        parse_absolute_time(text)
     }
 
     fn describe() -> &'static str {
@@ -81,7 +81,7 @@ impl Recognizable for TimeExpr {
     }
 }
 
-fn try_absolute_time(text: &str) -> Result<Option<TimeExpr>, TimeParseError> {
+fn parse_absolute_time(text: &str) -> Result<Option<TimeExpr>, TimeParseError> {
     // colon, "am", "pm", "o'clock", ...?
 
     // 10:30am/pm AM/PM a/p A/P
@@ -151,13 +151,13 @@ fn try_absolute_time(text: &str) -> Result<Option<TimeExpr>, TimeParseError> {
     Ok(None)
 }
 
-fn try_casual_time(text: &str) -> Option<TimeExpr> {
+fn parse_casual_time(text: &str) -> Option<TimeExpr> {
     // "morning", "evening", "midnight", "mid{-}?day", ...?
 
     None
 }
 
-fn try_relative_time(text: &str) -> Option<TimeExpr> {
+fn parse_relative_time(text: &str) -> Option<TimeExpr> {
     // "in_hours/minutes",
     None
 }
