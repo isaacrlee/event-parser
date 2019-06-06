@@ -73,7 +73,13 @@ impl Recognizable for TimeExpr {
     type Error = TimeParseError;
 
     fn recognize(text: &str) -> Result<Option<TimeExpr>, Self::Error> {
-        parse_absolute_time(text)
+        if let Ok(Some(time)) = parse_absolute_time(text) {
+            return Ok(Some(time));
+        }
+        if let Ok(Some(time)) = parse_casual_time(text) {
+            return Ok(Some(time));
+        }
+        Ok(None)
     }
 
     fn describe() -> &'static str {
@@ -138,10 +144,10 @@ fn parse_absolute_time(text: &str) -> Result<Option<TimeExpr>, TimeParseError> {
     }
 
     // 10
-    let re = Regex::new(r"\d{1,2}").unwrap();
+    let re = Regex::new(r"(\s|^)(?P<time>\d{1,2})(\s|$)").unwrap();
 
-    if let Some(time) = re.find(text) {
-        let mut hour: u32 = time.as_str().parse().unwrap();
+    if let Some(caps) = re.captures_iter(text).next() {
+        let mut hour: u32 = caps["time"].parse().unwrap();
         if hour < 8 {
             hour += 12;
         }
@@ -151,10 +157,31 @@ fn parse_absolute_time(text: &str) -> Result<Option<TimeExpr>, TimeParseError> {
     Ok(None)
 }
 
-fn parse_casual_time(text: &str) -> Option<TimeExpr> {
+fn parse_casual_time(text: &str) -> Result<Option<TimeExpr>, TimeParseError> {
     // "morning", "evening", "midnight", "mid{-}?day", ...?
 
-    None
+    let casual_phrases = vec![
+        r"morning",
+        r"afternoon",
+        r"evening",
+        r"tonight",
+        r"noon",
+        r"midnight",
+    ];
+    let hours = vec![9, 14, 18, 21, 12, 0];
+
+    for (i, phrase) in casual_phrases.iter().enumerate() {
+        let re = Regex::new(phrase).unwrap();
+        println!("match: {:?}", re.find(&text));
+        if let Some(time) = re.find(&text) {
+            println!("hour: {}", hours[i]);
+            return Ok(Some(TimeExpr::Absolute(NaiveTime::from_hms(
+                hours[i], 0, 0,
+            ))));
+        }
+    }
+
+    Ok(None)
 }
 
 fn parse_relative_time(text: &str) -> Option<TimeExpr> {
@@ -174,6 +201,7 @@ mod time_expr_tests {
         assert_recognize_time("2", 14, 0);
         assert_recognize_time("10", 10, 0);
         assert_recognize_time("5", 17, 0);
+        assert_recognize_time("at 5", 17, 0);
     }
 
     #[test]
@@ -201,14 +229,13 @@ mod time_expr_tests {
     }
 
     #[test]
-
     fn casual_time_tests() {
-        // assert_recognize_time("in the morning", 9, 0);
-        // assert_recognize_time("this afternoon", 14, 0);
-        // assert_recognize_time("in the evening", 18, 0);
-        // assert_recognize_time("tonight", 21, 0);
-        // assert_recognize_time("noon", 12, 0);
-        // assert_recognize_time("midnight", 0, 0);
+        assert_recognize_time("in the morning", 9, 0);
+        assert_recognize_time("this afternoon", 14, 0);
+        assert_recognize_time("in the evening", 18, 0);
+        assert_recognize_time("tonight", 21, 0);
+        assert_recognize_time("noon", 12, 0);
+        assert_recognize_time("midnight", 0, 0);
     }
 
     fn assert_recognize_time(text: &str, expected_h: u32, expected_m: u32) {

@@ -46,6 +46,7 @@ impl DateParser {
             Some(expr) => match expr {
                 DateExpr::InMonth(m, d) => {
                     let nd = NaiveDate::from_ymd(now.year(), m as u32, d);
+                    println!("naive dat: {}", nd);
                     return Ok(Some(nd));
                 }
                 DateExpr::MonthDateYear(m, d, y) => {
@@ -272,6 +273,7 @@ fn parse_month_date_year(text: &str) -> Result<Option<DateExpr>, DateParseError>
     let re =
         Regex::new(r"(?P<month>\d{1,2})(/|-)(?P<date>\d{1,2})(/|-)(?P<year>\d{4}|\d{2})").unwrap();
 
+    println!("parse month date year");
     if let Some(caps) = re.captures_iter(text).next() {
         let month: u32 = caps["month"].parse().unwrap();
         let date: u32 = caps["date"].parse().unwrap();

@@ -17,6 +17,12 @@ fn main() {
         // println!("{:?}", event);
         // pretty_print(event);
         event.print();
+        //println!("{:?}", event.properties().values());
+
+        for property in event.properties().values() {
+            println!("{:?}", property);
+        }
+        pretty_print(event);
     }
 }
 // Examples
@@ -45,8 +51,10 @@ pub fn parse_input(text: &str) -> Event {
 
     let mut e = Event::new();
 
-    let now = Local::now();
+    let now_dt: DateTime<Local> = Local::now();
     let today = Local::today();
+
+    //let offset = now_dt.offset_from_utc_datetime(now_dt.naive_utc());
 
     // start time/date and end time/date
     let expr = get_start_and_end(text);
@@ -62,7 +70,8 @@ pub fn parse_input(text: &str) -> Event {
             // default to today
             let ndt = NaiveDateTime::new(today.naive_utc(), t);
             let dt = DateTime::<Utc>::from_utc(ndt, Utc); // TODO: Local
-                                                          // println!("dt: {}", dt);
+
+            println!("dt: {}", dt);
             e.starts(dt);
             let d = Duration::hours(1);
             e.ends(dt.checked_add_signed(d).unwrap());
@@ -71,8 +80,12 @@ pub fn parse_input(text: &str) -> Event {
             let date = Date::<Utc>::from_utc(d, Utc);
             e.all_day(date);
         }
-        EventStartAndEndExpr::StartsWithDate(time, d) => {
-            let date = Date::<Utc>::from_utc(d, Utc);
+        EventStartAndEndExpr::StartsWithDate(t, d) => {
+            let ndt = NaiveDateTime::new(d, t);
+            let dt = DateTime::<Utc>::from_utc(ndt, Utc);
+            dt.with_timezone(&Local);
+
+            e.starts(dt);
         }
         _ => {}
     }
@@ -96,6 +109,7 @@ fn get_start_and_end(text: &str) -> EventStartAndEndExpr {
     //  Get expressions before and after {'-', "to"}
 
     if let Some(start_time) = TimeParser::parse(text).unwrap() {
+        println!("start time: {}", start_time);
         if let Some(start_date) = DateParser::parse(text).unwrap() {
             return EventStartAndEndExpr::StartsWithDate(start_time, start_date);
         }
@@ -103,6 +117,7 @@ fn get_start_and_end(text: &str) -> EventStartAndEndExpr {
     }
 
     if let Some(start_date) = DateParser::parse(text).unwrap() {
+        println!("all day case");
         return EventStartAndEndExpr::AllDay(start_date);
     }
 
