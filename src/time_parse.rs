@@ -31,14 +31,30 @@ impl Error for TimeParseError {
 }
 
 #[derive(Default)]
-/// A date parser for string slices.
+/// A time parser for string slices.
 pub struct TimeParser {}
 
 impl TimeParser {
+    /// Parses this string slice into an option containing a `NaiveTime`.
+    /// # Example
+    /// ```
+    /// use chrono::NaiveTime;
+    /// use eventparser::{time_parse::TimeParser, recognizable::Recognizable};
+    ///
+    /// let time = TimeParser::parse("6:30pm");
+    /// assert_eq!(time, Ok(Some((NaiveTime::from_hms(18, 30, 0)))));
+    /// ```
     pub fn parse(text: &str) -> Result<Option<NaiveTime>, TimeParseError> {
         TimeParser::parse_relative(text, &Utc::now().time())
     }
 
+    /// Parses this string slice into an option containing a `NaiveTime` relative to `now`.
+    /// # Example
+    /// ```
+    /// use chrono::{NaiveTime, Utc};
+    /// use eventparser::{time_parse::TimeParser, recognizable::Recognizable};
+    /// let time = TimeParser::parse_relative("6:30pm", &Utc::now().time());
+    /// assert_eq!(time, Ok(Some((NaiveTime::from_hms(18, 30, 0)))));
     pub fn parse_relative(
         text: &str,
         now: &NaiveTime,
@@ -172,9 +188,9 @@ fn parse_casual_time(text: &str) -> Result<Option<TimeExpr>, TimeParseError> {
 
     for (i, phrase) in casual_phrases.iter().enumerate() {
         let re = Regex::new(phrase).unwrap();
-        println!("match: {:?}", re.find(&text));
+        // println!("match: {:?}", re.find(&text));
         if let Some(time) = re.find(&text) {
-            println!("hour: {}", hours[i]);
+            // println!("hour: {}", hours[i]);
             return Ok(Some(TimeExpr::Absolute(NaiveTime::from_hms(
                 hours[i], 0, 0,
             ))));
