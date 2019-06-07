@@ -85,6 +85,8 @@ pub fn parse_input(text: &str) -> Event {
             dt.with_timezone(&Local);
 
             e.starts(dt);
+            let d = Duration::hours(1);
+            e.ends(dt.checked_add_signed(d).unwrap());
         }
         _ => {}
     }
@@ -158,7 +160,7 @@ fn pretty_print(e: Event) {
     if let Some(loc) = e.properties().get("LOCATION") {
         let mut loc_string = String::new();
         loc.fmt_write(&mut loc_string).unwrap();
-        println!("Event: {:?}", parse_property(&loc_string, "LOCATION"));
+        println!("Location: {:?}", parse_property(&loc_string, "LOCATION"));
     }
 
     if let Some(start) = e.properties().get("DTSTART") {
@@ -180,7 +182,14 @@ fn pretty_print(e: Event) {
 }
 
 pub fn parse_property_to_ndt(s: &str, property: &str) -> NaiveDateTime {
-    NaiveDateTime::parse_from_str(parse_property(s, property), "%Y%m%dT%H%M%S").unwrap()
+    // TODO: Handle all day
+    match NaiveDateTime::parse_from_str(parse_property(s, property), "%Y%m%dT%H%M%S") {
+        Ok(res) => res,
+        Err(e) => match NaiveDateTime::parse_from_str(parse_property(s, property), "%Y%m%d") {
+            Ok(res) => res,
+            Err(r) => NaiveDate::from_ymd(2019, 7, 4).and_hms(0, 0, 0), // TODO: Error
+        },
+    }
 }
 
 pub fn parse_property<'a>(s: &'a str, property: &str) -> &'a str {
@@ -203,6 +212,15 @@ mod parse_input_tests {
         assert_parse_input("Dinner at 7", time_today(19, 0, 0), time_today(20, 0, 0));
     }
 
+    #[test]
+    fn all_day_tests() {
+        assert_parse_input(
+            "America's Birthday 7/4",
+            ndt_from_ymd(2019, 7, 4),
+            ndt_from_ymd(2019, 7, 4),
+        )
+    }
+
     // #[test]
     // fn start_with_date_tests() {
     //     assert_parse_input(
@@ -213,6 +231,10 @@ mod parse_input_tests {
     //     assert_parse_input("Lunch at 12pm ", time_today(12, 0, 0), time_today(13, 0, 0));
     //     assert_parse_input("Dinner at 7pm", time_today(7, 0, 0), time_today(8, 0, 0))
     // }
+
+    fn ndt_from_ymd(y: i32, m: u32, d: u32) -> NaiveDateTime {
+        NaiveDate::from_ymd(y, m, d).and_hms(0, 0, 0)
+    }
 
     fn time_today(h: u32, m: u32, s: u32) -> NaiveDateTime {
         Utc::today().and_hms(h, m, s).naive_utc()
