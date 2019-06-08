@@ -165,30 +165,36 @@ fn pretty_print(e: Event) {
 
     if let Some(start) = e.properties().get("DTSTART") {
         let mut start_string = String::new();
+
         start.fmt_write(&mut start_string).unwrap();
-        let start_ndt = parse_property_to_ndt(&start_string, "DTSTART");
+
+        let start_ndt = parse_property_to_ndt(&start_string, "DTSTART").unwrap();
+        //println!("GOT HERE");
         if let Some(end) = e.properties().get("DTEND") {
             let mut end_string = String::new();
             end.fmt_write(&mut end_string).unwrap();
-            let end_ndt = parse_property_to_ndt(&end_string, "DTEND");
-            println!(
-                "{}-{} {}",
-                start_ndt.format("%I:%M%P"),
-                end_ndt.format("%I:%M%P"),
-                start_ndt.format("%B %d %Y"),
-            );
+            if let Some(end_ndt) = parse_property_to_ndt(&end_string, "DTEND") {
+                println!(
+                    "{}-{} {}",
+                    start_ndt.format("%I:%M%P"),
+                    end_ndt.format("%I:%M%P"),
+                    start_ndt.format("%B %d %Y"),
+                );
+            }
         }
     }
 }
 
-pub fn parse_property_to_ndt(s: &str, property: &str) -> NaiveDateTime {
+pub fn parse_property_to_ndt(s: &str, property: &str) -> Option<NaiveDateTime> {
     // TODO: Handle all day
     match NaiveDateTime::parse_from_str(parse_property(s, property), "%Y%m%dT%H%M%S") {
-        Ok(res) => res,
-        Err(e) => match NaiveDateTime::parse_from_str(parse_property(s, property), "%Y%m%d") {
-            Ok(res) => res,
-            Err(r) => NaiveDate::from_ymd(2019, 7, 4).and_hms(0, 0, 0), // TODO: Error
-        },
+        Ok(res) => Some(res),
+        Err(e) => {
+            match NaiveDate::parse_from_str(parse_property_date_only(s, property), "%Y%m%d") {
+                Ok(res) => Some(res.and_hms(0, 0, 0)),
+                Err(r) => None, // TODO: Error
+            }
+        }
     }
 }
 
@@ -196,10 +202,16 @@ pub fn parse_property<'a>(s: &'a str, property: &str) -> &'a str {
     s.trim().get(property.len() + 1..).unwrap()
 }
 
+pub fn parse_property_date_only<'a>(s: &'a str, property: &str) -> &'a str {
+    s.trim()
+        .get(property.len() + ";VALUE=DATE:".len()..)
+        .unwrap()
+}
+
 #[cfg(test)]
 mod parse_input_tests {
     use super::{parse_input, parse_property_to_ndt, pretty_print};
-    use chrono::{NaiveDate, NaiveDateTime, Utc};
+    use chrono::{Local, NaiveDate, NaiveDateTime, Utc};
     use icalendar::{Component, Event};
     #[test]
     fn start_tests() {
@@ -214,11 +226,7 @@ mod parse_input_tests {
 
     #[test]
     fn all_day_tests() {
-        assert_parse_input(
-            "America's Birthday 7/4",
-            ndt_from_ymd(2019, 7, 4),
-            ndt_from_ymd(2019, 7, 4),
-        )
+        assert_parse_input_all_day("America's Birthday 7/4", ndt_from_ymd(2019, 7, 4))
     }
 
     // #[test]
@@ -237,7 +245,20 @@ mod parse_input_tests {
     }
 
     fn time_today(h: u32, m: u32, s: u32) -> NaiveDateTime {
-        Utc::today().and_hms(h, m, s).naive_utc()
+        Local::today().and_hms(h, m, s).naive_local()
+    }
+
+    fn assert_parse_input_all_day(input: &str, expected_start: NaiveDateTime) {
+        let e = parse_input(input);
+
+        let start = e.properties().get("DTSTART").unwrap();
+        let mut start_string = String::new();
+        start.fmt_write(&mut start_string).unwrap();
+
+        assert_eq!(
+            parse_property_to_ndt(&start_string, "DTSTART").unwrap(),
+            expected_start
+        );
     }
 
     fn assert_parse_input(input: &str, expected_start: NaiveDateTime, expected_end: NaiveDateTime) {
@@ -255,10 +276,13 @@ mod parse_input_tests {
         pretty_print(e);
 
         assert_eq!(
-            parse_property_to_ndt(&start_string, "DTSTART"),
+            parse_property_to_ndt(&start_string, "DTSTART").unwrap(),
             expected_start
         );
 
-        assert_eq!(parse_property_to_ndt(&end_string, "DTEND"), expected_end);
+        assert_eq!(
+            parse_property_to_ndt(&end_string, "DTEND").unwrap(),
+            expected_end
+        );
     }
 }

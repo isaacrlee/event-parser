@@ -1,4 +1,4 @@
-use chrono::{Datelike, NaiveDate, Utc};
+use chrono::{Datelike, Duration, NaiveDate, Utc};
 use regex::Regex;
 use std::error::Error;
 use std::fmt;
@@ -60,7 +60,6 @@ impl DateParser {
         text: &str,
         now: &NaiveDate,
     ) -> Result<Option<NaiveDate>, DateParseError> {
-        //unimplemented!()
         let date_opt = DateExpr::recognize(text)?;
 
         match date_opt {
@@ -70,7 +69,7 @@ impl DateParser {
                     // println!("naive dat: {}", nd);
                     return Ok(Some(nd));
                 }
-                DateExpr::MonthDateYear(m, d, y) => {
+                DateExpr::InYear(m, d, y) => {
                     let nd = NaiveDate::from_ymd(y, m, d);
                     return Ok(Some(nd));
                 }
@@ -176,12 +175,12 @@ enum DayOfWeek {
 // An abstract syntax for parsing dates.
 enum DateExpr {
     Today,
-    MonthDateYear(u32, u32, i32), // TODO: Replace with InYear
-    DayInNWeeks(i8, DayOfWeek),   // e.g. next week monday => DayInNWeeks(1, Mon)
-    InMonth(MonthOfYear, u32),    // e.g. June 8th => InMonth(Jun, 8)
-    InYear(Year, i16),
-    // Since(Box<DateExpr>, Duration),
-    // NthSince(Box<DateExpr>, isize, DayOfWeek)
+    InYear(u32, u32, i32),      // TODO: Replace with InYear
+    DayInNWeeks(i8, DayOfWeek), // e.g. next week monday => DayInNWeeks(1, Mon)
+    InMonth(MonthOfYear, u32),  // e.g. June 8th => InMonth(Jun, 8)
+    //InYear(Year, i16),
+    Since(Box<DateExpr>, Duration),
+    NthSince(Box<DateExpr>, isize, DayOfWeek),
     InNDays(usize),
 }
 
@@ -288,7 +287,7 @@ fn parse_in_month(text: &str) -> Result<Option<DateExpr>, DateParseError> {
     Ok(None)
 }
 
-/// Parses string slice `text into an `Option` containing a `DateExpr::MonthDateYear(u32, u32, i32)`.
+/// Parses string slice `text into an `Option` containing a `DateExpr::InYear(u32, u32, i32)`.
 fn parse_month_date_year(text: &str) -> Result<Option<DateExpr>, DateParseError> {
     // 6/1, 06/01, 06-01-15
 
@@ -300,7 +299,7 @@ fn parse_month_date_year(text: &str) -> Result<Option<DateExpr>, DateParseError>
         let month: u32 = caps["month"].parse().unwrap();
         let date: u32 = caps["date"].parse().unwrap();
         let year: i32 = caps["year"].parse().unwrap();
-        return Ok(Some(DateExpr::MonthDateYear(month, date, year)));
+        return Ok(Some(DateExpr::InYear(month, date, year)));
     }
 
     Ok(None)
@@ -420,7 +419,7 @@ mod date_expr_tests {
     fn assert_recognize_month_date_year(text: &str, m: u32, d: u32, y: i32) {
         assert_eq!(
             DateExpr::recognize(text),
-            Ok(Some(DateExpr::MonthDateYear(m, d, y)))
+            Ok(Some(DateExpr::InYear(m, d, y)))
         )
     }
 }
