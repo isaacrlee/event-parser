@@ -208,6 +208,10 @@ pub fn parse_property_date_only<'a>(s: &'a str, property: &str) -> &'a str {
         .unwrap()
 }
 
+///////////////////////////////
+// TESTS
+//////////////////////////////
+
 #[cfg(test)]
 mod parse_input_tests {
     use super::{parse_input, parse_property_to_ndt, pretty_print};
@@ -222,6 +226,8 @@ mod parse_input_tests {
             time_today(13, 30, 0),
         );
         assert_parse_input("Dinner at 7", time_today(19, 0, 0), time_today(20, 0, 0));
+        assert_parse_input("Lunch at 12pm", time_today(12, 0, 0), time_today(13, 0, 0));
+        assert_parse_input("Dinner at 7pm", time_today(19, 0, 0), time_today(20, 0, 0));
     }
 
     #[test]
@@ -229,16 +235,14 @@ mod parse_input_tests {
         assert_parse_input_all_day("America's Birthday 7/4", ndt_from_ymd(2019, 7, 4))
     }
 
-    // #[test]
-    // fn start_with_date_tests() {
-    //     assert_parse_input(
-    //         "Lunch at 1pm 6/15",
-    //         time_today(13, 0, 0),
-    //         time_today(14, 0, 0),
-    //     );
-    //     assert_parse_input("Lunch at 12pm ", time_today(12, 0, 0), time_today(13, 0, 0));
-    //     assert_parse_input("Dinner at 7pm", time_today(7, 0, 0), time_today(8, 0, 0))
-    // }
+    #[test]
+    fn start_with_date_tests() {
+        assert_parse_input(
+            "Lunch at 1pm 6/15",
+            time_and_date(13, 0, 0, 6, 15),
+            time_and_date(14, 0, 0, 6, 15),
+        );
+    }
 
     fn ndt_from_ymd(y: i32, m: u32, d: u32) -> NaiveDateTime {
         NaiveDate::from_ymd(y, m, d).and_hms(0, 0, 0)
@@ -246,6 +250,10 @@ mod parse_input_tests {
 
     fn time_today(h: u32, m: u32, s: u32) -> NaiveDateTime {
         Local::today().and_hms(h, m, s).naive_local()
+    }
+
+    fn time_and_date(h: u32, m: u32, s: u32, mon: u32, d: u32) -> NaiveDateTime {
+        NaiveDate::from_ymd(2019, mon, d).and_hms(h, m, s)
     }
 
     fn assert_parse_input_all_day(input: &str, expected_start: NaiveDateTime) {
