@@ -175,56 +175,19 @@ enum DayOfWeek {
 // An abstract syntax for parsing dates.
 enum DateExpr {
     Today,
-    InYear(MonthOfYear, u32, i32), // TODO: Replace with InYear
-    DayInNWeeks(i8, DayOfWeek),    // e.g. next week monday => DayInNWeeks(1, Mon)
-    InMonth(MonthOfYear, u32),     // e.g. June 8th => InMonth(Jun, 8)
-    //InYear(Year, i16),
-    Since(Box<DateExpr>, Duration),
-    NthSince(Box<DateExpr>, isize, DayOfWeek),
     InNDays(usize),
+    DayInNWeeks(i8, DayOfWeek), // e.g. next week monday => DayInNWeeks(1, Mon)
+    InMonth(MonthOfYear, u32),  // e.g. June 8th => InMonth(Jun, 8)
+    InYear(MonthOfYear, u32, i32),
+    // Since(Box<DateExpr>, Duration),
+    // NthSince(Box<DateExpr>, isize, DayOfWeek),
 }
-
-// impl Recognizable for YearExpr {
-//     type Error = DateParseError;
-
-//     fn recognize(text: &str) -> Result<Option<YearExpr>, Self::Error> {
-//         unimplemented!()
-//     }
-
-//     fn describe() -> &'static str {
-//         "month"
-//     }
-// }
-
-// impl Recognizable for MonthExpr {
-//     type Error = DateParseError;
-
-//     fn recognize(text: &str) -> Result<Option<MonthExpr>, Self::Error> {
-//         unimplemented!()
-//     }
-
-//     fn describe() -> &'static str {
-//         "month"
-//     }
-// }
-
-// impl Recognizable for WeekExpr {
-//     type Error = DateParseError;
-
-//     fn recognize(text: &str) -> Result<Option<WeekExpr>, Self::Error> {
-//         unimplemented!()
-//     }
-
-//     fn describe() -> &'static str {
-//         "week"
-//     }
-// }
 
 impl Recognizable for DateExpr {
     type Error = DateParseError;
 
     fn recognize(text: &str) -> Result<Option<DateExpr>, Self::Error> {
-        if let Ok(Some(date)) = parse_month_date_year(text) {
+        if let Ok(Some(date)) = parse_in_year(text) {
             return Ok(Some(date));
         }
         if let Ok(Some(date)) = parse_in_month(text) {
@@ -288,13 +251,12 @@ fn parse_in_month(text: &str) -> Result<Option<DateExpr>, DateParseError> {
 }
 
 /// Parses string slice `text into an `Option` containing a `DateExpr::InYear(u32, u32, i32)`.
-fn parse_month_date_year(text: &str) -> Result<Option<DateExpr>, DateParseError> {
+fn parse_in_year(text: &str) -> Result<Option<DateExpr>, DateParseError> {
     // 6/1, 06/01, 06-01-15
 
     let re =
         Regex::new(r"(?P<month>\d{1,2})(/|-)(?P<date>\d{1,2})(/|-)(?P<year>\d{4}|\d{2})").unwrap();
 
-    // println!("parse month date year");
     if let Some(caps) = re.captures_iter(text).next() {
         let month: u32 = caps["month"].parse().unwrap();
         let date: u32 = caps["date"].parse().unwrap();
@@ -398,7 +360,7 @@ mod date_expr_tests {
     //use chrono::NaiveDate;
 
     #[test]
-    fn month_date_tests() {
+    fn in_month_tests() {
         assert_recognize_in_month("06/05", Jun, 5);
         assert_recognize_in_month("06-05", Jun, 5);
         assert_recognize_in_month("6/5", Jun, 5);
@@ -410,9 +372,9 @@ mod date_expr_tests {
     }
 
     #[test]
-    fn month_date_year_tests() {
-        assert_recognize_month_date_year("12/15/19", 12, 15, 19);
-        assert_recognize_month_date_year("12/15/2000", 12, 15, 2000);
+    fn in_year_tests() {
+        assert_recognize_in_year("12/15/19", 12, 15, 19);
+        assert_recognize_in_year("12/15/2000", 12, 15, 2000);
     }
 
     #[test]
@@ -438,7 +400,7 @@ mod date_expr_tests {
         )
     }
 
-    fn assert_recognize_month_date_year(text: &str, m: u32, d: u32, y: i32) {
+    fn assert_recognize_in_year(text: &str, m: u32, d: u32, y: i32) {
         assert_eq!(
             DateExpr::recognize(text),
             Ok(Some(DateExpr::InYear(num_to_month(m).unwrap(), d, y)))
@@ -452,7 +414,6 @@ mod month_expr_tests {
         MonthOfYear::{self, *},
         Recognizable,
     };
-    use chrono::NaiveDate;
 
     // #[test]
     // fn absolute_month_tests() {
@@ -482,11 +443,11 @@ mod month_expr_tests {
     //     assert_recognize_date("Mon", 6, 5, 19);
     // }
 
-    fn assert_recognize_month(text: &str, expected_m: MonthOfYear) {
-        assert_eq!(MonthOfYear::recognize(text), Ok(Some(expected_m)))
-    }
-
     fn assert_recognize_day(text: &str, expected_d: DayOfWeek) {
         assert_eq!(DayOfWeek::recognize(text), Ok(Some(expected_d)))
+    }
+
+    fn assert_recognize_month(text: &str, expected_m: MonthOfYear) {
+        assert_eq!(MonthOfYear::recognize(text), Ok(Some(expected_m)))
     }
 }
