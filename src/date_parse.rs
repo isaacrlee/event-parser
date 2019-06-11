@@ -11,7 +11,7 @@ impl DateParser {
     /// # Example
     /// ```
     /// use chrono::NaiveDate;
-    /// use eventparser::{date_parse::DateParser, recognizable::Recognizable};
+    /// use datetimeparser::{date_parse::DateParser, recognizable::Recognizable};
     ///
     /// let date = DateParser::parse("July 4 2019");
     ///
@@ -25,7 +25,7 @@ impl DateParser {
     /// # Example
     /// ```
     /// use chrono::{NaiveDate, Utc};
-    /// use eventparser::{date_parse::DateParser, recognizable::Recognizable};
+    /// use datetimeparser::{date_parse::DateParser, recognizable::Recognizable};
     ///
     /// let date = DateParser::parse_relative("July 4 2019", Utc::now().date().naive_utc());
     ///

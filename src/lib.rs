@@ -1,3 +1,7 @@
+//! # Date Time Parser
+//!
+//! A library for parsing structured and unstructered text into `NaiveDate` and `NaiveTime` formats."
+
 pub mod date_parse;
 pub mod recognizable;
 pub mod time_parse;

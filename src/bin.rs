@@ -1,6 +1,11 @@
+//! # Event Parser
+//!
+//! A utility for parsing unstructered text into [iCalendar Events](../icalendar/struct.Event.html) using the [datetimeparser](../datetimeparser/index.html) library.
+
+
 use chrono::{Date, DateTime, Duration, Local, NaiveDate, NaiveDateTime, NaiveTime, Utc};
-use eventparser::date_parse::DateParser;
-use eventparser::time_parse::TimeParser;
+use datetimeparser::date_parse::DateParser;
+use datetimeparser::time_parse::TimeParser;
 use icalendar::{Component, Event};
 use regex::Regex;
 use std::io::BufRead;

@@ -14,7 +14,7 @@ impl TimeParser {
     /// # Example
     /// ```
     /// use chrono::NaiveTime;
-    /// use eventparser::{time_parse::TimeParser, recognizable::Recognizable};
+    /// use datetimeparser::{time_parse::TimeParser, recognizable::Recognizable};
     ///
     /// let time = TimeParser::parse("6:30pm");
     /// assert_eq!(time, Some(NaiveTime::from_hms(18, 30, 0)));
@@ -27,7 +27,7 @@ impl TimeParser {
     /// # Example
     /// ```
     /// use chrono::{NaiveTime, Utc};
-    /// use eventparser::{time_parse::TimeParser, recognizable::Recognizable};
+    /// use datetimeparser::{time_parse::TimeParser, recognizable::Recognizable};
     /// let time = TimeParser::parse_relative("6:30pm", Utc::now().time());
     /// assert_eq!(time, Some(NaiveTime::from_hms(18, 30, 0)));
     pub fn parse_relative(text: &str, now: NaiveTime) -> Option<NaiveTime> {
