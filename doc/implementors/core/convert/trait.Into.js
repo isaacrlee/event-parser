@@ -1,0 +1,10 @@
+(function() {var implementors = {};
+implementors["icalendar"] = [{text:"impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/convert/trait.Into.html\" title=\"trait core::convert::Into\">Into</a>&lt;<a class=\"struct\" href=\"icalendar/struct.Property.html\" title=\"struct icalendar::Property\">Property</a>&gt; for <a class=\"enum\" href=\"icalendar/enum.Class.html\" title=\"enum icalendar::Class\">Class</a>",synthetic:false,types:["icalendar::properties::Class"]},{text:"impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/convert/trait.Into.html\" title=\"trait core::convert::Into\">Into</a>&lt;<a class=\"struct\" href=\"icalendar/struct.Parameter.html\" title=\"struct icalendar::Parameter\">Parameter</a>&gt; for <a class=\"enum\" href=\"icalendar/enum.ValueType.html\" title=\"enum icalendar::ValueType\">ValueType</a>",synthetic:false,types:["icalendar::properties::ValueType"]},{text:"impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/convert/trait.Into.html\" title=\"trait core::convert::Into\">Into</a>&lt;<a class=\"struct\" href=\"icalendar/struct.Property.html\" title=\"struct icalendar::Property\">Property</a>&gt; for <a class=\"enum\" href=\"icalendar/enum.EventStatus.html\" title=\"enum icalendar::EventStatus\">EventStatus</a>",synthetic:false,types:["icalendar::properties::EventStatus"]},{text:"impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/convert/trait.Into.html\" title=\"trait core::convert::Into\">Into</a>&lt;<a class=\"struct\" href=\"icalendar/struct.Property.html\" title=\"struct icalendar::Property\">Property</a>&gt; for <a class=\"enum\" href=\"icalendar/enum.TodoStatus.html\" title=\"enum icalendar::TodoStatus\">TodoStatus</a>",synthetic:false,types:["icalendar::properties::TodoStatus"]},];
+
+            if (window.register_implementors) {
+                window.register_implementors(implementors);
+            } else {
+                window.pending_implementors = implementors;
+            }
+        
+})()

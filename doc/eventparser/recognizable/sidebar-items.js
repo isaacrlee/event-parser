@@ -1,0 +1,1 @@
+initSidebarItems({"trait":[["Recognizable","An interface for dealing with parsing unstructured text."]]});
