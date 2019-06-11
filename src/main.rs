@@ -12,10 +12,7 @@ fn main() {
     let stdin = std::io::stdin();
     for line in stdin.lock().lines() {
         let event = parse_input(&line.unwrap());
-        // println!("{:?}", event);
-        // pretty_print(event);
         event.print();
-        //println!("{:?}", event.properties().values());
 
         pretty_print(event);
     }

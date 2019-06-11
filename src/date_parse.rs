@@ -47,7 +47,7 @@ impl DateParser {
                     return Some(nd);
                 }
                 DateExpr::InNDays(n) => {
-                    let d = Duration::hours(n as i64);
+                    let d = Duration::days(n as i64);
                     return Some(now.checked_add_signed(d).unwrap());
                 }
                 DateExpr::DayInNWeeks(n, d) => {
@@ -114,7 +114,7 @@ fn num_to_month(num: u32) -> Option<MonthOfYear> {
 #[derive(Debug, PartialEq)]
 // An abstract syntax for parsing dates.
 enum DateExpr {
-    InNDays(u32),
+    InNDays(i32),
     DayInNWeeks(i8, Weekday), // e.g. next week monday => DayInNWeeks(1, Mon)
     InNMonths(i32),           // e.g. in 2 months => InNMonths(2)
     InMonth(MonthOfYear, u32), // e.g. June 8th => InMonth(Jun, 8)
@@ -123,6 +123,9 @@ enum DateExpr {
 
 impl Recognizable for DateExpr {
     fn recognize(text: &str) -> Option<DateExpr> {
+        if let Some(date) = parse_keywords(text) {
+            return Some(date);
+        }
         if let Some(date) = parse_relative_date(text) {
             return Some(date);
         }
@@ -180,6 +183,26 @@ impl Recognizable for MonthOfYear {
 // (12pm, 12, noon, twelve, at 12, 10:30, 12:30pm}
 // {Saturday, 6/1, sat, this saturday, next saturday, last saturday, june 1, june 1st}
 // {tonight, last night, tomorrow night, tomorrow morning, lunch, dinner, breakfast, dawn, late, afternoon, evening, now, in two hours, midnight}
+
+fn parse_keywords(text: &str) -> Option<DateExpr> {
+    // today, tomorrow, yesterday
+
+    let re = Regex::new(r"(?i)\b(?P<key>today|tomorrow|yesterday)\b").unwrap();
+
+    if let Some(caps) = re.captures(text) {
+        if let Some(key_match) = caps.name("key") {
+            let n = match key_match.as_str().to_lowercase().as_ref() {
+                "today" => 0,
+                "tomorrow" => 1,
+                "yesterday" => -1,
+                _ => 0,
+            };
+            return Some(DateExpr::InNDays(n));
+        }
+    }
+
+    None
+}
 
 /// Parses string slice `text into an `Option` containing a `DateExpr::Absolute(NaiveDate)`.
 fn parse_in_month(text: &str) -> Option<DateExpr> {
@@ -299,7 +322,7 @@ fn parse_relative_date(text: &str) -> Option<DateExpr> {
     let re = Regex::new(r"(in\s(?P<num>\d{1,3})\s(days?))").unwrap();
     if let Some(caps) = re.captures(text) {
         if let Some(num_match) = caps.name("num") {
-            let num: u32 = num_match.as_str().parse().unwrap();
+            let num: i32 = num_match.as_str().parse().unwrap();
             return Some(DateExpr::InNDays(num));
         }
     }
@@ -419,6 +442,13 @@ mod date_expr_tests {
         assert_day_in_n_weeks("this monday", Mon, 0);
     }
 
+    #[test]
+    fn day_keywords() {
+        assert_in_n_days("tomorrow", 1);
+        assert_in_n_days("yesterday", -1);
+        assert_in_n_days("today", 0);
+    }
+
     fn assert_recognize_in_month(text: &str, expected_m: MonthOfYear, expected_d: u32) {
         assert_eq!(
             DateExpr::recognize(text),
@@ -433,7 +463,7 @@ mod date_expr_tests {
         )
     }
 
-    fn assert_in_n_days(text: &str, n: u32) {
+    fn assert_in_n_days(text: &str, n: i32) {
         assert_eq!(DateExpr::recognize(text), Some(DateExpr::InNDays(n)))
     }
 
