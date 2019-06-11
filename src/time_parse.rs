@@ -20,7 +20,7 @@ impl TimeParser {
     /// assert_eq!(time, Some(NaiveTime::from_hms(18, 30, 0)));
     /// ```
     pub fn parse(text: &str) -> Option<NaiveTime> {
-        TimeParser::parse_relative(text, &Utc::now().time())
+        TimeParser::parse_relative(text, Utc::now().time())
     }
 
     /// Parses this string slice into an option containing a `NaiveTime` relative to `now`.
@@ -28,12 +28,11 @@ impl TimeParser {
     /// ```
     /// use chrono::{NaiveTime, Utc};
     /// use eventparser::{time_parse::TimeParser, recognizable::Recognizable};
-    /// let time = TimeParser::parse_relative("6:30pm", &Utc::now().time());
+    /// let time = TimeParser::parse_relative("6:30pm", Utc::now().time());
     /// assert_eq!(time, Some(NaiveTime::from_hms(18, 30, 0)));
-    pub fn parse_relative(text: &str, now: &NaiveTime) -> Option<NaiveTime> {
-        let time_opt = TimeExpr::recognize(text);
-        match time_opt {
-            Some(expr) => match expr {
+    pub fn parse_relative(text: &str, now: NaiveTime) -> Option<NaiveTime> {
+        if let Some(time_expr) = TimeExpr::recognize(text) {
+            match time_expr {
                 TimeExpr::Absolute(nt) => {
                     return Some(nt);
                 }
@@ -45,23 +44,21 @@ impl TimeParser {
                     let d = Duration::minutes(m as i64);
                     return Some(now.overflowing_add_signed(d).0);
                 }
-                _ => {}
-            },
-            _ => {}
+            }
         }
         None
     }
 }
 
 #[derive(Debug, PartialEq)]
-// An abstract syntax for parsing times.
+// An intermediate expression for parsing unstructured text into `NaiveTime`.
 enum TimeExpr {
     Absolute(NaiveTime),
     InNHours(u32),
     InNMins(u32),
 }
 
-// https://github.com/wanasit/chrono/blob/master/src/parsers/en/ENTimeExpressionParser.js
+/// Parsing a `str` into a TimeExpr uses both structured formats and common phrases.
 impl Recognizable for TimeExpr {
     fn recognize(text: &str) -> Option<TimeExpr> {
         if let Some(time) = parse_relative_time(text) {
@@ -120,6 +117,7 @@ fn parse_absolute_time(text: &str) -> Option<TimeExpr> {
     None
 }
 
+/// Parses a `str` into an `Option` containing a `TimeExpr::Absolute(NaiveTime)`.
 fn parse_casual_time(text: &str) -> Option<TimeExpr> {
     // "morning", "evening", "midnight", "mid{-}?day", ...?
 
@@ -136,7 +134,7 @@ fn parse_casual_time(text: &str) -> Option<TimeExpr> {
     for (i, phrase) in casual_phrases.iter().enumerate() {
         let re = Regex::new(phrase).unwrap();
         // println!("match: {:?}", re.find(&text));
-        if let Some(_) = re.find(&text) {
+        if re.find(&text).is_some() {
             // println!("hour: {}", hours[i]);
             return Some(TimeExpr::Absolute(NaiveTime::from_hms(hours[i], 0, 0)));
         }
@@ -145,6 +143,7 @@ fn parse_casual_time(text: &str) -> Option<TimeExpr> {
     None
 }
 
+/// Parses a `str` into an `Option` containing a `TimeExpr::InNHours(u32)`.
 fn parse_relative_time(text: &str) -> Option<TimeExpr> {
     // "in_hours/minutes"
 

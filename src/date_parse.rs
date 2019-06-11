@@ -4,7 +4,6 @@ use regex::Regex;
 use crate::recognizable::Recognizable;
 
 /// A date parser for string slices.
-/// # Example
 pub struct DateParser {}
 
 impl DateParser {
@@ -19,27 +18,24 @@ impl DateParser {
     /// assert_eq!(date, Some(NaiveDate::from_ymd(2019, 7, 4)));
     /// ```
     pub fn parse(text: &str) -> Option<NaiveDate> {
-        DateParser::parse_relative(text, &Utc::now().date().naive_utc())
+        DateParser::parse_relative(text, Utc::now().date().naive_utc())
     }
 
-    /// Parses this string slice into an option containing a `NaiveDate` relative to `now`.
+    /// Parses `text` into an option containing a `NaiveDate` relative to `now`.
     /// # Example
     /// ```
     /// use chrono::{NaiveDate, Utc};
     /// use eventparser::{date_parse::DateParser, recognizable::Recognizable};
     ///
-    /// let date = DateParser::parse_relative("July 4 2019", &Utc::now().date().naive_utc());
+    /// let date = DateParser::parse_relative("July 4 2019", Utc::now().date().naive_utc());
     ///
     /// assert_eq!(date, Some(NaiveDate::from_ymd(2019, 7, 4)));
     /// ```
-    pub fn parse_relative(text: &str, now: &NaiveDate) -> Option<NaiveDate> {
-        let date_opt = DateExpr::recognize(text);
-
-        match date_opt {
-            Some(expr) => match expr {
+    pub fn parse_relative(text: &str, now: NaiveDate) -> Option<NaiveDate> {
+        if let Some(date_expr) = DateExpr::recognize(text) {
+            match date_expr {
                 DateExpr::InMonth(m, d) => {
                     let nd = NaiveDate::from_ymd(now.year(), m as u32, d);
-                    // println!("naive dat: {}", nd);
                     return Some(nd);
                 }
                 DateExpr::InYear(m, d, y) => {
@@ -65,8 +61,7 @@ impl DateParser {
                     let to_month = (now_month as i32) + n;
                     return Some(NaiveDate::from_ymd(now.year(), to_month as u32, now.day()));
                 }
-            },
-            _ => {}
+            }
         }
         None
     }
@@ -77,6 +72,7 @@ impl DateParser {
 struct Year(pub isize);
 
 #[derive(Debug, PartialEq)]
+/// The month of the year.
 enum MonthOfYear {
     Jan = 1,
     Feb = 2,
@@ -118,9 +114,10 @@ enum DateExpr {
     DayInNWeeks(i8, Weekday), // e.g. next week monday => DayInNWeeks(1, Mon)
     InNMonths(i32),           // e.g. in 2 months => InNMonths(2)
     InMonth(MonthOfYear, u32), // e.g. June 8th => InMonth(Jun, 8)
-    InYear(MonthOfYear, u32, i32),
+    InYear(MonthOfYear, u32, i32), // e.g. June 8th, 2019 => InYear(Jun, 8, 2019)
 }
 
+/// Parsing a `str` into a DateExpr uses both structured formats and common phrases.
 impl Recognizable for DateExpr {
     fn recognize(text: &str) -> Option<DateExpr> {
         if let Some(date) = parse_keywords(text) {
@@ -159,6 +156,7 @@ impl Recognizable for DateExpr {
     }
 }
 
+/// Parsing a str into a `Weekday` uses the format %W.
 impl Recognizable for Weekday {
     fn recognize(text: &str) -> Option<Weekday> {
         text.parse::<Weekday>().ok()
@@ -169,6 +167,7 @@ impl Recognizable for Weekday {
     }
 }
 
+/// Parsing a str into a `MonthOfYear` uses english abbreviations and full names.
 impl Recognizable for MonthOfYear {
     fn recognize(text: &str) -> Option<MonthOfYear> {
         parse_month_of_year_english(text)
@@ -179,11 +178,7 @@ impl Recognizable for MonthOfYear {
     }
 }
 
-// Examples
-// (12pm, 12, noon, twelve, at 12, 10:30, 12:30pm}
-// {Saturday, 6/1, sat, this saturday, next saturday, last saturday, june 1, june 1st}
-// {tonight, last night, tomorrow night, tomorrow morning, lunch, dinner, breakfast, dawn, late, afternoon, evening, now, in two hours, midnight}
-
+/// Parses common keywords into an `Option` containing a `DateExpr::InNDays(i32)`.
 fn parse_keywords(text: &str) -> Option<DateExpr> {
     // today, tomorrow, yesterday
 
@@ -204,7 +199,7 @@ fn parse_keywords(text: &str) -> Option<DateExpr> {
     None
 }
 
-/// Parses string slice `text into an `Option` containing a `DateExpr::Absolute(NaiveDate)`.
+/// Parses a `str` into an `Option` containing a `DateExpr::InMonth(MonthOfYear, u32)`.
 fn parse_in_month(text: &str) -> Option<DateExpr> {
     // 6/1, 06/01, 06-01-15
 
@@ -223,7 +218,7 @@ fn parse_in_month(text: &str) -> Option<DateExpr> {
     None
 }
 
-/// Parses string slice `text into an `Option` containing a `DateExpr::InYear(u32, u32, i32)`.
+/// Parses a `str` into an `Option` containing a `DateExpr::InYear(MonthOfYear, u32, i32)`.
 fn parse_in_year(text: &str) -> Option<DateExpr> {
     // 6/1, 06/01, 06-01-15
 
@@ -245,7 +240,7 @@ fn parse_in_year(text: &str) -> Option<DateExpr> {
     None
 }
 
-/// Parses string slice `text into an `Option` containing a `DateExpr::InMonth(MonthOfYear, u32)`.
+/// Parses a `str` into an `Option` containing a `DateExpr::InMonth(MonthOfYear, u32)`.
 fn parse_month_date_english(text: &str) -> Option<DateExpr> {
     //june 1, june 1st
 
@@ -267,7 +262,7 @@ fn parse_month_date_english(text: &str) -> Option<DateExpr> {
     None
 }
 
-/// Parses string slice `text into an `Option` containing a `DateExpr::InWeek(Box<WeekExpr>, DayOfWeek)`
+/// Parses a `str` into an `Option` containing a `DateExpr::InWeek(i8, Weekday)`
 fn parse_date_in_week(text: &str) -> Option<DateExpr> {
     // sat, this saturday, next saturday, last saturday, this sat,
 
@@ -295,6 +290,7 @@ fn parse_date_in_week(text: &str) -> Option<DateExpr> {
     None
 }
 
+/// Parses a `str` into an `Option` containing a `DateExpr::InWeek(i8, Weekday)`
 fn parse_day_alone(text: &str) -> Option<DateExpr> {
     // saturday
 
@@ -315,7 +311,7 @@ fn parse_day_alone(text: &str) -> Option<DateExpr> {
     None
 }
 
-/// Parses string slice `text into an `Option` containing a `DateExpr::InNDays(usize)`
+/// Parses a `str` into an `Option` containing a `DateExpr::InNDays(i32)`
 fn parse_relative_date(text: &str) -> Option<DateExpr> {
     // in two days, in 2 days
 
@@ -330,6 +326,7 @@ fn parse_relative_date(text: &str) -> Option<DateExpr> {
     None
 }
 
+/// Parses a `str` into an `Option` containing a `DateExpr::InNMonths(i32)`
 fn parse_relative_month(text: &str) -> Option<DateExpr> {
     // this month, next month, last month
     let re = Regex::new(r"(?i)(?P<prep>next|last|this)\smonth").unwrap();
@@ -350,6 +347,7 @@ fn parse_relative_month(text: &str) -> Option<DateExpr> {
     None
 }
 
+/// Parses a `str` into an `Option` containing a `DateExpr::InNMonths(i32)`
 fn parse_in_n_months(text: &str) -> Option<DateExpr> {
     // in 2 months
 
@@ -364,7 +362,7 @@ fn parse_in_n_months(text: &str) -> Option<DateExpr> {
     None
 }
 
-/// Parses string slice `text into an `Option` containing a `MonthOfYear`.
+/// Parses a `str` into an `Option` containing a `MonthOfYear`.
 fn parse_month_of_year_english(text: &str) -> Option<MonthOfYear> {
     let re = Regex::new(r"(?i)(?P<month>jan|january|feb|mar|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)(r?uary|ch|il|e|y|ust|tember|ober|ember|\b)").unwrap();
 
@@ -397,7 +395,7 @@ mod date_expr_tests {
         MonthOfYear::{self, *},
         Recognizable,
     };
-    //use chrono::NaiveDate;
+
     use chrono::Weekday::{self, *};
 
     #[test]
@@ -449,6 +447,18 @@ mod date_expr_tests {
         assert_in_n_days("today", 0);
     }
 
+    #[test]
+    fn relative_month_tests() {
+        assert_relative_month("in 4 months", 4);
+        assert_relative_month("in 1 month", 1);
+    }
+
+    #[test]
+    fn next_month_tests() {
+        assert_relative_month("next month", 1);
+        assert_relative_month("this month", 0);
+    }
+
     fn assert_recognize_in_month(text: &str, expected_m: MonthOfYear, expected_d: u32) {
         assert_eq!(
             DateExpr::recognize(text),
@@ -470,22 +480,20 @@ mod date_expr_tests {
     fn assert_day_in_n_weeks(text: &str, d: Weekday, n: i8) {
         assert_eq!(DateExpr::recognize(text), Some(DateExpr::DayInNWeeks(n, d)))
     }
+
+    fn assert_relative_month(text: &str, expected_n: i32) {
+        assert_eq!(
+            DateExpr::recognize(text),
+            Some(DateExpr::InNMonths(expected_n))
+        )
+    }
 }
 
-mod month_expr_tests {
+mod month_of_year_tests {
     use super::{
-        DateExpr,
-        // DayOfWeek::{self, *},
         MonthOfYear::{self, *},
         Recognizable,
     };
-
-    use chrono::Weekday::{self, *};
-
-    // #[test]
-    // fn absolute_month_tests() {
-    //     assert_recognize_month("06/05", MonthOfYear::Jun);
-    // }
 
     #[test]
     fn english_month_tests() {
@@ -497,26 +505,7 @@ mod month_expr_tests {
         assert_recognize_month("julie 7 jul 5", Jul);
     }
 
-    #[test]
-    fn relative_month_tests() {
-        assert_relative_month("in 4 months", 4);
-        assert_relative_month("in 1 month", 1);
-    }
-
-    #[test]
-    fn next_month_tests() {
-        assert_relative_month("next month", 1);
-        assert_relative_month("this month", 0);
-    }
-
     fn assert_recognize_month(text: &str, expected_m: MonthOfYear) {
         assert_eq!(MonthOfYear::recognize(text), Some(expected_m))
-    }
-
-    fn assert_relative_month(text: &str, expected_n: i32) {
-        assert_eq!(
-            DateExpr::recognize(text),
-            Some(DateExpr::InNMonths(expected_n))
-        )
     }
 }

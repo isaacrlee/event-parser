@@ -1,29 +1,21 @@
-use chrono::{Date, DateTime, Duration, Local, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
+use chrono::{Date, DateTime, Duration, Local, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use eventparser::date_parse::DateParser;
 use eventparser::time_parse::TimeParser;
-use icalendar::{Component, Event, Property};
-use regex::{Regex, RegexSet};
-use std::io::{self, prelude::*, BufRead, BufReader, Read, Write};
-
-// TODO: Generic Read/Write
+use icalendar::{Component, Event};
+use regex::Regex;
+use std::io::BufRead;
 
 fn main() {
     println!("e.g. Lunch at 12pm");
     let stdin = std::io::stdin();
     for line in stdin.lock().lines() {
-        let event = parse_input(&line.unwrap());
-        event.print();
-
+        let event = to_event(&line.unwrap());
+        // event.print();
         pretty_print(event);
     }
 }
 
-// Examples
-// StartsAndEnds: Concert {7-9pm, 7-9, 7 to 9, from 7 to 9, from seven to nine}
-// AllDayStartsAndEnds: Welcome Week {9/1-9/8, September {1st-8, 1-8}}
-
-// Structs
-/// Abstract expression for the start and end of an event.
+/// An intermediate expression for parsing the start and end of an `Event`.
 enum EventStartAndEndExpr {
     Unknown,
     Starts(NaiveTime),
@@ -34,35 +26,24 @@ enum EventStartAndEndExpr {
     AllDayStartsAndEnds(NaiveDate, NaiveDate),
 }
 
-// Parse Function
-
-/// Parses input string into Event
+/// Parses `text` into an `Event`.
+/// # Example
 /// ```
-/// use super::parse_input(text: &str);
-/// let event = parse_input("Lunch at 12pm");
+/// use super::to_event;
+/// let event = to_event("Lunch at 12pm");
 /// ```
-pub fn parse_input(text: &str) -> Event {
-    // println!("Input: {}", text);
-
+pub fn to_event(text: &str) -> Event {
     let mut e = Event::new();
 
-    let now_dt: DateTime<Local> = Local::now();
     let today = Local::today();
 
-    //let offset = now_dt.offset_from_utc_datetime(now_dt.naive_utc());
-
-    // start time/date and end time/date
-    let expr = get_start_and_end(text);
-
-    // use EventStartAndEndExpr::*;
+    let expr = to_start_end_expr(text);
 
     match expr {
         EventStartAndEndExpr::Unknown => {
             e.all_day(today);
         }
         EventStartAndEndExpr::Starts(t) => {
-            println!("starts");
-            // TODO: check if time is later than now => set day to tomorrow, else, set day to today
             // default to today
             let dt = DateTime::<Utc>::from_utc(NaiveDateTime::new(today.naive_utc(), t), Utc);
             dt.with_timezone(&Local);
@@ -71,11 +52,9 @@ pub fn parse_input(text: &str) -> Event {
             e.ends(dt.checked_add_signed(Duration::hours(1)).unwrap()); // end is 1 hour after start
         }
         EventStartAndEndExpr::AllDay(d) => {
-            println!("all day");
             e.all_day(Date::<Utc>::from_utc(d, Utc));
         }
         EventStartAndEndExpr::StartsWithDate(t, d) => {
-            println!("starts with date");
             let dt = DateTime::<Utc>::from_utc(NaiveDateTime::new(d, t), Utc);
             dt.with_timezone(&Local);
 
@@ -83,8 +62,6 @@ pub fn parse_input(text: &str) -> Event {
             e.ends(dt.checked_add_signed(Duration::hours(1)).unwrap()); // end is 1 hour after start
         }
         EventStartAndEndExpr::StartsAndEnds(start, end) => {
-            println!("starts and ends");
-            // TODO: check if time is later than now => set day to tomorrow, else, set day to today
             // default to today
             let start_dt =
                 DateTime::<Utc>::from_utc(NaiveDateTime::new(today.naive_utc(), start), Utc);
@@ -97,7 +74,6 @@ pub fn parse_input(text: &str) -> Event {
             e.ends(end_dt);
         }
         EventStartAndEndExpr::StartsAndEndsWithDate(start, end, d) => {
-            println!("starts and ends with date");
             let start_dt = DateTime::<Utc>::from_utc(NaiveDateTime::new(d, start), Utc);
             start_dt.with_timezone(&Local);
 
@@ -108,18 +84,17 @@ pub fn parse_input(text: &str) -> Event {
             e.ends(end_dt);
         }
         EventStartAndEndExpr::AllDayStartsAndEnds(start, end) => {
-            println!("all day starts and ends");
             e.start_date(Date::<Utc>::from_utc(start, Utc));
             e.end_date(Date::<Utc>::from_utc(end, Utc));
         }
     }
 
-    // location
+    // location parsing is not yet supported
     // if let Some(loc) = get_location(text) {
     //     e.location(&loc);
     // }
 
-    if let Some(summary) = get_summary(text) {
+    if let Some(summary) = summary(text) {
         e.summary(&summary);
     }
 
@@ -127,11 +102,20 @@ pub fn parse_input(text: &str) -> Event {
 }
 
 /// Returns an `Option` containing an `EventStartAndEndExpr`.
-fn get_start_and_end(text: &str) -> EventStartAndEndExpr {
+/// # Example
+/// ```
+/// use super::{EventStartAndEndExpr, to_start_end_expr};
+/// use chrono::NaiveTime;
+///
+/// let expr = to_start_and_end_expr("3-5pm");
+/// let start = NaiveTime::from_hms(15, 0, 0);
+/// let end = NaiveTime::from_hms(15, 0, 0);
+/// assert_eq!(expr, EventStartAndEndExpr::StartAndEnd(start, end));
+/// ```
+fn to_start_end_expr(text: &str) -> EventStartAndEndExpr {
     // Hack: look for {'-', "to"}, if found, then it's a StartsAndEnds, StartsAndEndsWithDate, or AllDayStartsAndEnds
     //  Get expressions before and after {'-', "to"}
     let re = Regex::new(r"(?P<start>[/\w]+)(\s?(-|to)\s?)(?P<end>[/\w]+)").unwrap();
-
     if let Some(caps) = re.captures(text) {
         if let Some(start_match) = caps.name("start") {
             if let Some(start_time) = TimeParser::parse(start_match.as_str()) {
@@ -159,7 +143,6 @@ fn get_start_and_end(text: &str) -> EventStartAndEndExpr {
     }
 
     if let Some(start_time) = TimeParser::parse(text) {
-        // println!("start time: {}", start_time);
         if let Some(start_date) = DateParser::parse(text) {
             return EventStartAndEndExpr::StartsWithDate(start_time, start_date);
         }
@@ -167,35 +150,30 @@ fn get_start_and_end(text: &str) -> EventStartAndEndExpr {
     }
 
     if let Some(start_date) = DateParser::parse(text) {
-        // println!("all day case");
         return EventStartAndEndExpr::AllDay(start_date);
     }
 
     EventStartAndEndExpr::Unknown
 }
 
-/// Returns an `Option` containing an event's summary string parsed from `input`.
-fn get_summary(text: &str) -> Option<String> {
+/// Returns an `Option` containing an event's summary string parsed from `text`.
+fn summary(text: &str) -> Option<String> {
     let mut clean_text = text.to_string();
-    // println!("{}", text);
     // replace all patterns with ""
     let set = vec![r"\d{1,2}/(\d{1,2})", // dates
     r"(\d{1,2})(/)(\d{1,2})(/)(\d{4}|\d{2})", // dates
     r"(?i)(^|\b)(\d{1,2}):?(\d{2})?([ap]m?)?($|\b)", // times
     r"(?i)(jan|january|feb|mar|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)(r?uary|ch|il|e|y|ust|tember|ober|ember|\b)\s(?P<date>\d{1,2})?", // month dates
     r"(?i)(mon|tue|wed|thurs|fri|sat|sun)(r?day|r?sday|nesay|urday)?\b", // weekdays
-    r"(?i)(next|last|this)\s\w+", // relative words 
+    r"(?i)(next|last|this)\s\w+", // relative words
     r"(?i)\b(at|in|on|from|next|this|last|morning|afternoon|evening|night|noon|afternoon|tomorrow)\b",
     r"(?i)-"
     ]; // words to replace
 
     for pattern in set {
-        // println!("{}", clean_text);
         let re = Regex::new(pattern).unwrap();
         clean_text = re.replace_all(&clean_text, "").to_string();
     }
-
-    // println!("{}", clean_text.trim());
 
     Some(clean_text.trim().to_owned())
 }
@@ -208,13 +186,19 @@ fn pretty_print(e: Event) {
     if let Some(summary) = e.properties().get("SUMMARY") {
         let mut summary_string = String::new();
         summary.fmt_write(&mut summary_string).unwrap();
-        println!("Event: {:?}", parse_property(&summary_string, "SUMMARY"));
+        println!(
+            "Event: {:?}",
+            event_property_line_to_value_str(&summary_string, "SUMMARY")
+        );
     }
 
     if let Some(loc) = e.properties().get("LOCATION") {
         let mut loc_string = String::new();
         loc.fmt_write(&mut loc_string).unwrap();
-        println!("Location: {:?}", parse_property(&loc_string, "LOCATION"));
+        println!(
+            "Location: {:?}",
+            event_property_line_to_value_str(&loc_string, "LOCATION")
+        );
     }
 
     if let Some(start) = e.properties().get("DTSTART") {
@@ -222,11 +206,11 @@ fn pretty_print(e: Event) {
 
         start.fmt_write(&mut start_string).unwrap();
 
-        let start_ndt = parse_property_to_ndt(&start_string, "DTSTART").unwrap();
+        let start_ndt = event_property_line_to_ndt(&start_string, "DTSTART").unwrap();
         if let Some(end) = e.properties().get("DTEND") {
             let mut end_string = String::new();
             end.fmt_write(&mut end_string).unwrap();
-            if let Some(end_ndt) = parse_property_to_ndt(&end_string, "DTEND") {
+            if let Some(end_ndt) = event_property_line_to_ndt(&end_string, "DTEND") {
                 println!(
                     "{} {} - {} {}",
                     start_ndt.format("%I:%M%P"),
@@ -239,24 +223,33 @@ fn pretty_print(e: Event) {
     }
 }
 
-pub fn parse_property_to_ndt(s: &str, property: &str) -> Option<NaiveDateTime> {
+/// Helper function for getting the value of an event's `property` and converting it to a `NaiveDateTime`.
+fn event_property_line_to_ndt(s: &str, property: &str) -> Option<NaiveDateTime> {
     // TODO: Handle all day
-    match NaiveDateTime::parse_from_str(parse_property(s, property), "%Y%m%dT%H%M%S") {
+    match NaiveDateTime::parse_from_str(
+        event_property_line_to_value_str(s, property),
+        "%Y%m%dT%H%M%S",
+    ) {
         Ok(res) => Some(res),
-        Err(e) => {
-            match NaiveDate::parse_from_str(parse_property_date_only(s, property), "%Y%m%d") {
+        Err(_) => {
+            match NaiveDate::parse_from_str(
+                event_property_line_to_date_value_str(s, property),
+                "%Y%m%d",
+            ) {
                 Ok(res) => Some(res.and_hms(0, 0, 0)),
-                Err(_) => None, // TODO: Error
+                Err(_) => None,
             }
         }
     }
 }
 
-pub fn parse_property<'a>(s: &'a str, property: &str) -> &'a str {
+/// Helper function for getting the value of an event's `property`.
+fn event_property_line_to_value_str<'a>(s: &'a str, property: &str) -> &'a str {
     s.trim().get(property.len() + 1..).unwrap()
 }
 
-pub fn parse_property_date_only<'a>(s: &'a str, property: &str) -> &'a str {
+/// Helper function for getting the value of an event's `property` when value is a date.
+fn event_property_line_to_date_value_str<'a>(s: &'a str, property: &str) -> &'a str {
     s.trim()
         .get(property.len() + ";VALUE=DATE:".len()..)
         .unwrap()
@@ -267,22 +260,22 @@ pub fn parse_property_date_only<'a>(s: &'a str, property: &str) -> &'a str {
 //////////////////////////////
 
 #[cfg(test)]
-mod parse_input_tests {
-    use super::{get_summary, parse_input, parse_property_to_ndt, pretty_print};
-    use chrono::{Local, NaiveDate, NaiveDateTime, Utc};
-    use icalendar::{Component, Event};
+mod to_event_tests {
+    use super::{event_property_line_to_ndt, summary, to_event};
+    use chrono::{Local, NaiveDate, NaiveDateTime};
+    use icalendar::Component;
     #[test]
     fn start_tests() {
-        assert_parse_input("Lunch at 1pm", time_today(13, 0, 0), time_today(14, 0, 0));
-        assert_parse_input(
+        assert_to_event("Lunch at 1pm", time_today(13, 0, 0), time_today(14, 0, 0));
+        assert_to_event(
             "Lunch at 12:30pm",
             time_today(12, 30, 0),
             time_today(13, 30, 0),
         );
-        assert_parse_input("Dinner at 7", time_today(19, 0, 0), time_today(20, 0, 0));
-        assert_parse_input("Lunch at 12pm", time_today(12, 0, 0), time_today(13, 0, 0));
-        assert_parse_input("Dinner at 7pm", time_today(19, 0, 0), time_today(20, 0, 0));
-        assert_parse_input(
+        assert_to_event("Dinner at 7", time_today(19, 0, 0), time_today(20, 0, 0));
+        assert_to_event("Lunch at 12pm", time_today(12, 0, 0), time_today(13, 0, 0));
+        assert_to_event("Dinner at 7pm", time_today(19, 0, 0), time_today(20, 0, 0));
+        assert_to_event(
             "Flight on saturday at noon",
             time_and_date(12, 0, 0, 6, 15, 2019),
             time_and_date(13, 0, 0, 6, 15, 2019),
@@ -291,14 +284,14 @@ mod parse_input_tests {
 
     #[test]
     fn starts_and_ends_tests() {
-        assert_parse_input("Lunch 1-2", time_today(13, 0, 0), time_today(14, 0, 0));
-        assert_parse_input("Dinner 7-9pm", time_today(19, 0, 0), time_today(21, 0, 0));
-        assert_parse_input("Lunch 11-1pm", time_today(11, 0, 0), time_today(13, 0, 0));
+        assert_to_event("Lunch 1-2", time_today(13, 0, 0), time_today(14, 0, 0));
+        assert_to_event("Dinner 7-9pm", time_today(19, 0, 0), time_today(21, 0, 0));
+        assert_to_event("Lunch 11-1pm", time_today(11, 0, 0), time_today(13, 0, 0));
     }
 
     #[test]
     fn starts_and_ends_with_date_tests() {
-        assert_parse_input(
+        assert_to_event(
             "Lunch 1-2pm 6/10",
             time_and_date(13, 0, 0, 6, 10, 2019),
             time_and_date(14, 0, 0, 6, 10, 2019),
@@ -307,18 +300,18 @@ mod parse_input_tests {
 
     #[test]
     fn all_day_tests() {
-        assert_parse_input_all_day("America's Birthday 7/4", ndt_from_ymd(2019, 7, 4));
-        assert_parse_input_all_day("America's Birthday July 4th", ndt_from_ymd(2019, 7, 4));
+        assert_to_event_all_day("America's Birthday 7/4", ndt_from_ymd(2019, 7, 4));
+        assert_to_event_all_day("America's Birthday July 4th", ndt_from_ymd(2019, 7, 4));
     }
 
     #[test]
     fn start_with_date_tests() {
-        assert_parse_input(
+        assert_to_event(
             "Lunch at 1pm 6/15",
             time_and_date(13, 0, 0, 6, 15, 2019),
             time_and_date(14, 0, 0, 6, 15, 2019),
         );
-        assert_parse_input(
+        assert_to_event(
             "Lunch at 1pm next Friday",
             time_and_date(13, 0, 0, 6, 21, 2019),
             time_and_date(14, 0, 0, 6, 21, 2019),
@@ -327,7 +320,7 @@ mod parse_input_tests {
 
     #[test]
     fn all_day_starts_and_ends_tests() {
-        assert_parse_input(
+        assert_to_event(
             "Welcome Week 9/1-9/8",
             ndt_from_ymd(2019, 9, 1),
             ndt_from_ymd(2019, 9, 8),
@@ -337,39 +330,39 @@ mod parse_input_tests {
     #[test]
     fn get_summary_tests() {
         assert_eq!(
-            get_summary("Lunch at noon next Friday"),
+            summary("Lunch at noon next Friday"),
             Some("Lunch".to_owned())
         );
         assert_eq!(
-            get_summary("Dinner with friends tomorrow"),
+            summary("Dinner with friends tomorrow"),
             Some("Dinner with friends".to_owned())
         );
         assert_eq!(
-            get_summary("My Birthday April 5"),
+            summary("My Birthday April 5"),
             Some("My Birthday".to_owned())
         );
         assert_eq!(
-            get_summary("April 5 My Birthday"),
+            summary("April 5 My Birthday"),
             Some("My Birthday".to_owned())
         );
         assert_eq!(
-            get_summary("6pm Next Friday Doctor's Appointment"),
+            summary("6pm Next Friday Doctor's Appointment"),
             Some("Doctor's Appointment".to_owned())
         );
         assert_eq!(
-            get_summary("6pm Doctor's Appointment Next Friday"),
+            summary("6pm Doctor's Appointment Next Friday"),
             Some("Doctor's Appointment".to_owned())
         );
         assert_eq!(
-            get_summary("6pm Doctor's Appointment Next Friday"),
+            summary("6pm Doctor's Appointment Next Friday"),
             Some("Doctor's Appointment".to_owned())
         );
         assert_eq!(
-            get_summary("Flight on saturday at noon"),
+            summary("Flight on saturday at noon"),
             Some("Flight".to_owned())
         );
         assert_eq!(
-            get_summary("Senior Week 6/17-6/21"),
+            summary("Senior Week 6/17-6/21"),
             Some("Senior Week".to_owned())
         )
     }
@@ -386,21 +379,21 @@ mod parse_input_tests {
         NaiveDate::from_ymd(y, mon, d).and_hms(h, min, s)
     }
 
-    fn assert_parse_input_all_day(input: &str, expected_start: NaiveDateTime) {
-        let e = parse_input(input);
+    fn assert_to_event_all_day(input: &str, expected_start: NaiveDateTime) {
+        let e = to_event(input);
 
         let start = e.properties().get("DTSTART").unwrap();
         let mut start_string = String::new();
         start.fmt_write(&mut start_string).unwrap();
 
         assert_eq!(
-            parse_property_to_ndt(&start_string, "DTSTART").unwrap(),
+            event_property_line_to_ndt(&start_string, "DTSTART").unwrap(),
             expected_start
         );
     }
 
-    fn assert_parse_input(input: &str, expected_start: NaiveDateTime, expected_end: NaiveDateTime) {
-        let e = parse_input(input);
+    fn assert_to_event(input: &str, expected_start: NaiveDateTime, expected_end: NaiveDateTime) {
+        let e = to_event(input);
 
         let start = e.properties().get("DTSTART").unwrap();
         let end = e.properties().get("DTEND").unwrap();
@@ -411,15 +404,13 @@ mod parse_input_tests {
         let mut end_string = String::new();
         end.fmt_write(&mut end_string).unwrap();
 
-        // pretty_print(e);
-
         assert_eq!(
-            parse_property_to_ndt(&start_string, "DTSTART").unwrap(),
+            event_property_line_to_ndt(&start_string, "DTSTART").unwrap(),
             expected_start
         );
 
         assert_eq!(
-            parse_property_to_ndt(&end_string, "DTEND").unwrap(),
+            event_property_line_to_ndt(&end_string, "DTEND").unwrap(),
             expected_end
         );
     }
