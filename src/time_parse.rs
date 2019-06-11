@@ -1,34 +1,10 @@
 use chrono::{Duration, NaiveTime, Utc};
 use regex::*;
-use std::error::Error;
-use std::fmt;
 
 // use crate::date_parse::*;
 use crate::recognizable::Recognizable;
 
 extern crate regex;
-
-#[derive(Debug, PartialEq)]
-pub enum TimeParseError {
-    TimeUnknown,
-    TimeBad,
-    //RegexError
-}
-
-impl fmt::Display for TimeParseError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            TimeParseError::TimeUnknown => write!(f, "Error: Time unknown"),
-            TimeParseError::TimeBad => write!(f, "Error: Time bad format"),
-        }
-    }
-}
-
-impl Error for TimeParseError {
-    fn description(&self) -> &str {
-        "Time unknown"
-    }
-}
 
 #[derive(Default)]
 /// A time parser for string slices.
@@ -42,9 +18,9 @@ impl TimeParser {
     /// use eventparser::{time_parse::TimeParser, recognizable::Recognizable};
     ///
     /// let time = TimeParser::parse("6:30pm");
-    /// assert_eq!(time, Ok(Some((NaiveTime::from_hms(18, 30, 0)))));
+    /// assert_eq!(time, Some(NaiveTime::from_hms(18, 30, 0)));
     /// ```
-    pub fn parse(text: &str) -> Result<Option<NaiveTime>, TimeParseError> {
+    pub fn parse(text: &str) -> Option<NaiveTime> {
         TimeParser::parse_relative(text, &Utc::now().time())
     }
 
@@ -54,38 +30,33 @@ impl TimeParser {
     /// use chrono::{NaiveTime, Utc};
     /// use eventparser::{time_parse::TimeParser, recognizable::Recognizable};
     /// let time = TimeParser::parse_relative("6:30pm", &Utc::now().time());
-    /// assert_eq!(time, Ok(Some((NaiveTime::from_hms(18, 30, 0)))));
-    pub fn parse_relative(
-        text: &str,
-        now: &NaiveTime,
-    ) -> Result<Option<NaiveTime>, TimeParseError> {
-        let time_opt = TimeExpr::recognize(text)?;
-
+    /// assert_eq!(time, Some(NaiveTime::from_hms(18, 30, 0)));
+    pub fn parse_relative(text: &str, now: &NaiveTime) -> Option<NaiveTime> {
+        let time_opt = TimeExpr::recognize(text);
         match time_opt {
             Some(expr) => match expr {
                 TimeExpr::Absolute(nt) => {
-                    return Ok(Some(nt));
+                    return Some(nt);
                 }
                 TimeExpr::InNHours(h) => {
                     let d = Duration::hours(h as i64);
-                    return Ok(Some(now.overflowing_add_signed(d).0));
+                    return Some(now.overflowing_add_signed(d).0);
                 }
                 TimeExpr::InNMins(m) => {
                     let d = Duration::minutes(m as i64);
-                    return Ok(Some(now.overflowing_add_signed(d).0));
+                    return Some(now.overflowing_add_signed(d).0);
                 }
                 _ => {}
             },
-            None => return Ok(None),
+            _ => {}
         }
-        Ok(None)
+        None
     }
 }
 
 #[derive(Debug, PartialEq)]
 // An abstract syntax for parsing times.
 enum TimeExpr {
-    Now,
     Absolute(NaiveTime),
     InNHours(u32),
     InNMins(u32),
@@ -93,19 +64,17 @@ enum TimeExpr {
 
 // https://github.com/wanasit/chrono/blob/master/src/parsers/en/ENTimeExpressionParser.js
 impl Recognizable for TimeExpr {
-    type Error = TimeParseError;
-
-    fn recognize(text: &str) -> Result<Option<TimeExpr>, Self::Error> {
-        if let Ok(Some(time)) = parse_relative_time(text) {
-            return Ok(Some(time));
+    fn recognize(text: &str) -> Option<TimeExpr> {
+        if let Some(time) = parse_relative_time(text) {
+            return Some(time);
         }
-        if let Ok(Some(time)) = parse_absolute_time(text) {
-            return Ok(Some(time));
+        if let Some(time) = parse_absolute_time(text) {
+            return Some(time);
         }
-        if let Ok(Some(time)) = parse_casual_time(text) {
-            return Ok(Some(time));
+        if let Some(time) = parse_casual_time(text) {
+            return Some(time);
         }
-        Ok(None)
+        None
     }
 
     fn describe() -> &'static str {
@@ -113,12 +82,13 @@ impl Recognizable for TimeExpr {
     }
 }
 
-fn parse_absolute_time(text: &str) -> Result<Option<TimeExpr>, TimeParseError> {
+fn parse_absolute_time(text: &str) -> Option<TimeExpr> {
     let re =
         Regex::new(r"(?i)(^|\b)(?P<hour>\d{1,2}):?(?P<minute>\d{2})?(?P<meridiem>[ap]m?)?($|\b)")
             .unwrap();
 
-    if let Some(caps) = re.captures(text) {
+    let date_pattern = Regex::new(r"\d{1,2}/\d{1,2}").unwrap();
+    if let Some(caps) = re.captures(&date_pattern.replace_all(text, "")) {
         let mut hour: u32 = 0;
         let mut minute = 0;
 
@@ -145,15 +115,13 @@ fn parse_absolute_time(text: &str) -> Result<Option<TimeExpr>, TimeParseError> {
             }
         }
 
-        return Ok(Some(TimeExpr::Absolute(NaiveTime::from_hms(
-            hour, minute, 0,
-        ))));
+        return Some(TimeExpr::Absolute(NaiveTime::from_hms(hour, minute, 0)));
     }
 
-    Ok(None)
+    None
 }
 
-fn parse_casual_time(text: &str) -> Result<Option<TimeExpr>, TimeParseError> {
+fn parse_casual_time(text: &str) -> Option<TimeExpr> {
     // "morning", "evening", "midnight", "mid{-}?day", ...?
 
     let casual_phrases = vec![
@@ -169,34 +137,33 @@ fn parse_casual_time(text: &str) -> Result<Option<TimeExpr>, TimeParseError> {
     for (i, phrase) in casual_phrases.iter().enumerate() {
         let re = Regex::new(phrase).unwrap();
         // println!("match: {:?}", re.find(&text));
-        if let Some(time) = re.find(&text) {
+        if let Some(_) = re.find(&text) {
             // println!("hour: {}", hours[i]);
-            return Ok(Some(TimeExpr::Absolute(NaiveTime::from_hms(
-                hours[i], 0, 0,
-            ))));
+            return Some(TimeExpr::Absolute(NaiveTime::from_hms(hours[i], 0, 0)));
         }
     }
 
-    Ok(None)
+    None
 }
 
-fn parse_relative_time(text: &str) -> Result<Option<TimeExpr>, TimeParseError> {
-    // "in_hours/minutes",
+fn parse_relative_time(text: &str) -> Option<TimeExpr> {
+    // "in_hours/minutes"
+
     let re = Regex::new(r"in (?P<mins>\d{1,2}) (mins|minutes|min|minute)").unwrap();
 
     if let Some(caps) = re.captures_iter(text).next() {
-        let mut mins: u32 = caps["mins"].parse().unwrap();
-        return Ok(Some(TimeExpr::InNMins(mins)));
+        let mins: u32 = caps["mins"].parse().unwrap();
+        return Some(TimeExpr::InNMins(mins));
     }
 
     let re = Regex::new(r"in (?P<hours>\d{1,2}) (hrs|hours|hr|hour)").unwrap();
 
     if let Some(caps) = re.captures_iter(text).next() {
-        let mut hours: u32 = caps["hours"].parse().unwrap();
-        return Ok(Some(TimeExpr::InNHours(hours)));
+        let hours: u32 = caps["hours"].parse().unwrap();
+        return Some(TimeExpr::InNHours(hours));
     }
 
-    Ok(None)
+    None
 }
 
 // Tests
@@ -266,23 +233,23 @@ mod time_expr_tests {
     fn assert_recognize_time(text: &str, expected_h: u32, expected_m: u32) {
         assert_eq!(
             TimeExpr::recognize(text),
-            Ok(Some(TimeExpr::Absolute(NaiveTime::from_hms(
+            Some(TimeExpr::Absolute(NaiveTime::from_hms(
                 expected_h, expected_m, 0
-            ))))
+            )))
         )
     }
 
     fn assert_in_mins_time(text: &str, expected_m: u32) {
         assert_eq!(
             TimeExpr::recognize(text),
-            Ok(Some(TimeExpr::InNMins(expected_m)))
+            Some(TimeExpr::InNMins(expected_m))
         )
     }
 
     fn assert_in_hours_time(text: &str, expected_m: u32) {
         assert_eq!(
             TimeExpr::recognize(text),
-            Ok(Some(TimeExpr::InNHours(expected_m)))
+            Some(TimeExpr::InNHours(expected_m))
         )
     }
 }

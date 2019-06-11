@@ -9,9 +9,7 @@
 
 /// An interface for dealing with parsing slices into an abstract syntax.
 pub trait Recognizable: Sized {
-    type Error: std::error::Error;
-
-    fn recognize(text: &str) -> Result<Option<Self>, Self::Error>;
+    fn recognize(text: &str) -> Option<Self>;
 
     fn describe() -> &'static str;
 }

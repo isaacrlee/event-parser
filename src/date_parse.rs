@@ -1,31 +1,7 @@
-use chrono::{Datelike, Duration, NaiveDate, Utc};
+use chrono::{Datelike, Duration, NaiveDate, Utc, Weekday};
 use regex::Regex;
-use std::error::Error;
-use std::fmt;
 
 use crate::recognizable::Recognizable;
-
-#[derive(Debug, PartialEq)]
-/// The error type for date parsing.
-pub enum DateParseError {
-    DateUnknown,
-    DateBad, // E.g. January 45th
-}
-
-impl fmt::Display for DateParseError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            DateParseError::DateUnknown => write!(f, "Error: Date unknown"),
-            DateParseError::DateBad => write!(f, "Error: Bad date"),
-        }
-    }
-}
-
-impl Error for DateParseError {
-    fn description(&self) -> &str {
-        "Date unknown"
-    }
-}
 
 /// A date parser for string slices.
 /// # Example
@@ -40,9 +16,9 @@ impl DateParser {
     ///
     /// let date = DateParser::parse("July 4 2019");
     ///
-    /// assert_eq!(date, Ok(Some((NaiveDate::from_ymd(2019, 7, 4)))));
+    /// assert_eq!(date, Some(NaiveDate::from_ymd(2019, 7, 4)));
     /// ```
-    pub fn parse(text: &str) -> Result<Option<NaiveDate>, DateParseError> {
+    pub fn parse(text: &str) -> Option<NaiveDate> {
         DateParser::parse_relative(text, &Utc::now().date().naive_utc())
     }
 
@@ -54,30 +30,45 @@ impl DateParser {
     ///
     /// let date = DateParser::parse_relative("July 4 2019", &Utc::now().date().naive_utc());
     ///
-    /// assert_eq!(date, Ok(Some((NaiveDate::from_ymd(2019, 7, 4)))));
+    /// assert_eq!(date, Some(NaiveDate::from_ymd(2019, 7, 4)));
     /// ```
-    pub fn parse_relative(
-        text: &str,
-        now: &NaiveDate,
-    ) -> Result<Option<NaiveDate>, DateParseError> {
-        let date_opt = DateExpr::recognize(text)?;
+    pub fn parse_relative(text: &str, now: &NaiveDate) -> Option<NaiveDate> {
+        let date_opt = DateExpr::recognize(text);
 
         match date_opt {
             Some(expr) => match expr {
                 DateExpr::InMonth(m, d) => {
                     let nd = NaiveDate::from_ymd(now.year(), m as u32, d);
                     // println!("naive dat: {}", nd);
-                    return Ok(Some(nd));
+                    return Some(nd);
                 }
                 DateExpr::InYear(m, d, y) => {
                     let nd = NaiveDate::from_ymd(y, m as u32, d);
-                    return Ok(Some(nd));
+                    return Some(nd);
                 }
-                _ => {}
+                DateExpr::InNDays(n) => {
+                    let d = Duration::hours(n as i64);
+                    return Some(now.checked_add_signed(d).unwrap());
+                }
+                DateExpr::DayInNWeeks(n, d) => {
+                    let mut difference: i32 = (d.num_days_from_sunday() as i32)
+                        - (now.weekday().num_days_from_sunday() as i32);
+                    if difference < 0 {
+                        difference = 7 - difference;
+                    }
+                    difference += 7 * (n as i32);
+                    let dur = Duration::days(difference as i64);
+                    return Some(now.checked_add_signed(dur).unwrap());
+                }
+                DateExpr::InNMonths(n) => {
+                    let now_month = now.month();
+                    let to_month = (now_month as i32) + n;
+                    return Some(NaiveDate::from_ymd(now.year(), to_month as u32, now.day()));
+                }
             },
-            None => return Ok(None),
+            _ => {}
         }
-        Ok(None)
+        None
     }
 }
 
@@ -120,84 +111,44 @@ fn num_to_month(num: u32) -> Option<MonthOfYear> {
     }
 }
 
-// #[derive(Debug, PartialEq)]
-// struct Month {
-//     year: Year,
-//     month: MonthOfYear,
-// }
-
-#[derive(Debug, PartialEq)]
-enum DayOfWeek {
-    Sun,
-    Mon,
-    Tue,
-    Wed,
-    Thu,
-    Fri,
-    Sat,
-}
-
-// #[derive(Debug, PartialEq)]
-// enum YearExpr {
-//     ThisYear,
-//     Absolute(Year),
-//     // OfMonth(Box<MonthExpr>),
-//     // OfWeek(Box<WeekExpr>),
-//     // OfDay(Box<DateExpr>),
-//     // Since(Box<YearExpr>, Duration)
-//     InNYears(usize),
-// }
-
-// #[derive(Debug, PartialEq)]
-// enum MonthExpr {
-//     ThisMonth,
-//     Absolute(MonthOfYear),
-//     InYear(Box<YearExpr>, MonthOfYear),
-//     // OfWeek(Box<WeekExpr>),
-//     // OfDay(Box<DateExpr>),
-//     // Since(Box<MonthExpr>, Duration),
-//     // NthSince(Box<MonthExpr>, isize, MonthOfYear),
-//     InNMonths(usize),
-// }
-
-// #[derive(Debug, PartialEq)]
-// enum WeekExpr {
-//     ThisWeek,
-//     Absolute(Year, i8),
-//     InMonth(Box<MonthExpr>, i8),
-//     // InYear(Box<YearExpr>, i8),
-//     // OfDay(Box<DateExpr>),
-//     // Since(Box<WeekExpr>, Duration),
-//     InNWeeks(usize),
-// }
-
 #[derive(Debug, PartialEq)]
 // An abstract syntax for parsing dates.
 enum DateExpr {
-    Today,
-    InNDays(usize),
-    DayInNWeeks(i8, DayOfWeek), // e.g. next week monday => DayInNWeeks(1, Mon)
-    InMonth(MonthOfYear, u32),  // e.g. June 8th => InMonth(Jun, 8)
+    InNDays(u32),
+    DayInNWeeks(i8, Weekday), // e.g. next week monday => DayInNWeeks(1, Mon)
+    InNMonths(i32),           // e.g. in 2 months => InNMonths(2)
+    InMonth(MonthOfYear, u32), // e.g. June 8th => InMonth(Jun, 8)
     InYear(MonthOfYear, u32, i32),
-    // Since(Box<DateExpr>, Duration),
-    // NthSince(Box<DateExpr>, isize, DayOfWeek),
 }
 
 impl Recognizable for DateExpr {
-    type Error = DateParseError;
+    fn recognize(text: &str) -> Option<DateExpr> {
+        if let Some(date) = parse_relative_date(text) {
+            return Some(date);
+        }
+        if let Some(date) = parse_in_year(text) {
+            return Some(date);
+        }
+        if let Some(date) = parse_in_month(text) {
+            return Some(date);
+        }
+        if let Some(date) = parse_month_date_english(text) {
+            return Some(date);
+        }
+        if let Some(date) = parse_date_in_week(text) {
+            return Some(date);
+        }
+        if let Some(date) = parse_in_n_months(text) {
+            return Some(date);
+        }
+        if let Some(date) = parse_relative_month(text) {
+            return Some(date);
+        }
+        if let Some(date) = parse_day_alone(text) {
+            return Some(date);
+        }
 
-    fn recognize(text: &str) -> Result<Option<DateExpr>, Self::Error> {
-        if let Ok(Some(date)) = parse_in_year(text) {
-            return Ok(Some(date));
-        }
-        if let Ok(Some(date)) = parse_in_month(text) {
-            return Ok(Some(date));
-        }
-        if let Ok(Some(date)) = parse_month_date_english(text) {
-            return Ok(Some(date));
-        }
-
-        Ok(None)
+        None
     }
 
     fn describe() -> &'static str {
@@ -205,11 +156,9 @@ impl Recognizable for DateExpr {
     }
 }
 
-impl Recognizable for DayOfWeek {
-    type Error = DateParseError;
-
-    fn recognize(text: &str) -> Result<Option<DayOfWeek>, Self::Error> {
-        parse_day_of_week(text)
+impl Recognizable for Weekday {
+    fn recognize(text: &str) -> Option<Weekday> {
+        text.parse::<Weekday>().ok()
     }
 
     fn describe() -> &'static str {
@@ -218,9 +167,7 @@ impl Recognizable for DayOfWeek {
 }
 
 impl Recognizable for MonthOfYear {
-    type Error = DateParseError;
-
-    fn recognize(text: &str) -> Result<Option<MonthOfYear>, Self::Error> {
+    fn recognize(text: &str) -> Option<MonthOfYear> {
         parse_month_of_year_english(text)
     }
 
@@ -235,119 +182,189 @@ impl Recognizable for MonthOfYear {
 // {tonight, last night, tomorrow night, tomorrow morning, lunch, dinner, breakfast, dawn, late, afternoon, evening, now, in two hours, midnight}
 
 /// Parses string slice `text into an `Option` containing a `DateExpr::Absolute(NaiveDate)`.
-fn parse_in_month(text: &str) -> Result<Option<DateExpr>, DateParseError> {
+fn parse_in_month(text: &str) -> Option<DateExpr> {
     // 6/1, 06/01, 06-01-15
 
-    let re = Regex::new(r"(?P<month>\d{1,2})(/|-)(?P<date>\d{1,2})").unwrap();
+    let re = Regex::new(r"(?P<month>\d{1,2})(/)(?P<date>\d{1,2})").unwrap();
 
-    if let Some(caps) = re.captures_iter(text).next() {
-        let month: u32 = caps["month"].parse().unwrap();
-        let date: u32 = caps["date"].parse().unwrap();
-
-        return Ok(Some(DateExpr::InMonth(num_to_month(month).unwrap(), date)));
+    if let Some(caps) = re.captures(text) {
+        if let Some(month_match) = caps.name("month") {
+            if let Some(date_match) = caps.name("date") {
+                let month: u32 = month_match.as_str().parse().unwrap();
+                let date: u32 = date_match.as_str().parse().unwrap();
+                return Some(DateExpr::InMonth(num_to_month(month).unwrap(), date));
+            }
+        }
     }
 
-    Ok(None)
+    None
 }
 
 /// Parses string slice `text into an `Option` containing a `DateExpr::InYear(u32, u32, i32)`.
-fn parse_in_year(text: &str) -> Result<Option<DateExpr>, DateParseError> {
+fn parse_in_year(text: &str) -> Option<DateExpr> {
     // 6/1, 06/01, 06-01-15
 
-    let re =
-        Regex::new(r"(?P<month>\d{1,2})(/|-)(?P<date>\d{1,2})(/|-)(?P<year>\d{4}|\d{2})").unwrap();
+    let re = Regex::new(r"(?P<month>\d{1,2})(/)(?P<date>\d{1,2})(/)(?P<year>\d{4}|\d{2})").unwrap();
 
-    if let Some(caps) = re.captures_iter(text).next() {
-        let month: u32 = caps["month"].parse().unwrap();
-        let date: u32 = caps["date"].parse().unwrap();
-        let year: i32 = caps["year"].parse().unwrap();
-        return Ok(Some(DateExpr::InYear(
-            num_to_month(month).unwrap(),
-            date,
-            year,
-        )));
+    if let Some(caps) = re.captures(text) {
+        if let Some(month_match) = caps.name("month") {
+            if let Some(date_match) = caps.name("date") {
+                if let Some(year_match) = caps.name("year") {
+                    let month: u32 = month_match.as_str().parse().unwrap();
+                    let date: u32 = date_match.as_str().parse().unwrap();
+                    let year: i32 = year_match.as_str().parse().unwrap();
+                    return Some(DateExpr::InYear(num_to_month(month).unwrap(), date, year));
+                }
+            }
+        }
     }
 
-    Ok(None)
+    None
 }
 
 /// Parses string slice `text into an `Option` containing a `DateExpr::InMonth(MonthOfYear, u32)`.
-fn parse_month_date_english(text: &str) -> Result<Option<DateExpr>, DateParseError> {
+fn parse_month_date_english(text: &str) -> Option<DateExpr> {
     //june 1, june 1st
-    // Generalize for having the date before the month, not just after
+
+    // TODO: Generalize for having the date before the month, not just after
     let re = Regex::new(r"(?i)(?P<month>jan|january|feb|mar|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)(r?uary|ch|il|e|y|ust|tember|ober|ember|\b)\s(?P<date>\d{1,2})?").unwrap();
 
-    if let Some(caps) = re.captures_iter(text).next() {
-        let month_str = caps["month"].to_lowercase();
-        let date: u32 = caps["date"].parse().unwrap();
-        if let Some(m) = MonthOfYear::recognize(&month_str)? {
-            return Ok(Some(DateExpr::InMonth(m, date)));
+    if let Some(caps) = re.captures(text) {
+        if let Some(month_match) = caps.name("month") {
+            if let Some(date_match) = caps.name("date") {
+                let date: u32 = date_match.as_str().parse().unwrap();
+                let month = month_match.as_str();
+                if let Some(m) = MonthOfYear::recognize(month) {
+                    return Some(DateExpr::InMonth(m, date));
+                }
+            }
         }
     }
 
-    Ok(None)
+    None
 }
 
 /// Parses string slice `text into an `Option` containing a `DateExpr::InWeek(Box<WeekExpr>, DayOfWeek)`
-fn parse_date_in_week(text: &str) -> Result<Option<DateExpr>, DateParseError> {
+fn parse_date_in_week(text: &str) -> Option<DateExpr> {
     // sat, this saturday, next saturday, last saturday, this sat,
 
-    unimplemented!()
+    let re = Regex::new(r"(?i)(?P<prep>next|last|this)\s(?P<day>\w+)").unwrap();
+
+    if let Some(caps) = re.captures(text) {
+        if let Some(prep_match) = caps.name("prep") {
+            let p = match prep_match.as_str().to_lowercase().as_ref() {
+                "next" => 1,
+                "last" => -1,
+                "this" => 0,
+                _ => 0,
+            };
+
+            if let Some(day_match) = caps.name("day") {
+                let day_str = day_match.as_str();
+
+                if let Some(d) = Weekday::recognize(day_str) {
+                    return Some(DateExpr::DayInNWeeks(p, d));
+                }
+            }
+        }
+    }
+
+    None
+}
+
+fn parse_day_alone(text: &str) -> Option<DateExpr> {
+    // saturday
+
+    let re = Regex::new(r"(?i)(?P<day>mon|tue|wed|thu|fri|sat|sun)(r?day|r?sday|nesay|urday)?\b")
+        .unwrap();
+
+    if let Some(caps) = re.captures(text) {
+        if let Some(day_match) = caps.name("day") {
+            let d = day_match
+                .as_str()
+                .to_lowercase()
+                .parse::<Weekday>()
+                .unwrap();
+            return Some(DateExpr::DayInNWeeks(0, d));
+        }
+    }
+
+    None
 }
 
 /// Parses string slice `text into an `Option` containing a `DateExpr::InNDays(usize)`
-fn parse_relative_date(text: &str) -> Result<Option<DateExpr>, DateParseError> {
+fn parse_relative_date(text: &str) -> Option<DateExpr> {
     // in two days, in 2 days
-    unimplemented!()
-}
 
-/// Parses string slice `text into an `Option` containing a `DayOfWeek`.
-fn parse_day_of_week(text: &str) -> Result<Option<DayOfWeek>, DateParseError> {
-    let re = Regex::new(r"(?i)(?P<day>mon|tue|wed|thurs|fri|sat|sun)(r?day|sday|nesay|urday|\b)")
-        .unwrap();
-
-    if let Some(caps) = re.captures_iter(text).next() {
-        let day = caps["day"].to_lowercase();
-
-        match day.as_ref() {
-            "mon" => return Ok(Some(DayOfWeek::Mon)),
-            "tue" => return Ok(Some(DayOfWeek::Tue)),
-            "wed" => return Ok(Some(DayOfWeek::Wed)),
-            "thu" => return Ok(Some(DayOfWeek::Thu)),
-            "fri" => return Ok(Some(DayOfWeek::Fri)),
-            "sat" => return Ok(Some(DayOfWeek::Sat)),
-            "sun" => return Ok(Some(DayOfWeek::Sun)),
-            _ => return Ok(None),
+    let re = Regex::new(r"(in\s(?P<num>\d{1,3})\s(days?))").unwrap();
+    if let Some(caps) = re.captures(text) {
+        if let Some(num_match) = caps.name("num") {
+            let num: u32 = num_match.as_str().parse().unwrap();
+            return Some(DateExpr::InNDays(num));
         }
     }
 
-    Ok(None)
+    None
+}
+
+fn parse_relative_month(text: &str) -> Option<DateExpr> {
+    // this month, next month, last month
+    let re = Regex::new(r"(?i)(?P<prep>next|last|this)\smonth").unwrap();
+
+    if let Some(caps) = re.captures(text) {
+        if let Some(prep_match) = caps.name("prep") {
+            let p = match prep_match.as_str().to_lowercase().as_ref() {
+                "next" => 1,
+                "last" => -1,
+                "this" => 0,
+                _ => 0,
+            };
+
+            return Some(DateExpr::InNMonths(p));
+        }
+    }
+
+    None
+}
+
+fn parse_in_n_months(text: &str) -> Option<DateExpr> {
+    // in 2 months
+
+    let re = Regex::new(r"(in\s(?P<num>\d{1,3})\s(months?))").unwrap();
+    if let Some(caps) = re.captures(text) {
+        if let Some(num_match) = caps.name("num") {
+            let num: i32 = num_match.as_str().parse().unwrap();
+            return Some(DateExpr::InNMonths(num));
+        }
+    }
+
+    None
 }
 
 /// Parses string slice `text into an `Option` containing a `MonthOfYear`.
-fn parse_month_of_year_english(text: &str) -> Result<Option<MonthOfYear>, DateParseError> {
+fn parse_month_of_year_english(text: &str) -> Option<MonthOfYear> {
     let re = Regex::new(r"(?i)(?P<month>jan|january|feb|mar|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)(r?uary|ch|il|e|y|ust|tember|ober|ember|\b)").unwrap();
 
-    if let Some(caps) = re.captures_iter(text).next() {
-        let month = caps["month"].to_lowercase();
-        match month.as_ref() {
-            "jan" => return Ok(Some(MonthOfYear::Jan)),
-            "feb" => return Ok(Some(MonthOfYear::Feb)),
-            "mar" => return Ok(Some(MonthOfYear::Mar)),
-            "apr" => return Ok(Some(MonthOfYear::Apr)),
-            "may" => return Ok(Some(MonthOfYear::May)),
-            "jun" => return Ok(Some(MonthOfYear::Jun)),
-            "jul" => return Ok(Some(MonthOfYear::Jul)),
-            "aug" => return Ok(Some(MonthOfYear::Aug)),
-            "sep" => return Ok(Some(MonthOfYear::Sep)),
-            "oct" => return Ok(Some(MonthOfYear::Oct)),
-            "nov" => return Ok(Some(MonthOfYear::Nov)),
-            "dec" => return Ok(Some(MonthOfYear::Dec)),
-            _ => return Ok(None),
+    if let Some(caps) = re.captures(text) {
+        if let Some(month_match) = caps.name("month") {
+            match month_match.as_str().to_lowercase().as_ref() {
+                "jan" => return Some(MonthOfYear::Jan),
+                "feb" => return Some(MonthOfYear::Feb),
+                "mar" => return Some(MonthOfYear::Mar),
+                "apr" => return Some(MonthOfYear::Apr),
+                "may" => return Some(MonthOfYear::May),
+                "jun" => return Some(MonthOfYear::Jun),
+                "jul" => return Some(MonthOfYear::Jul),
+                "aug" => return Some(MonthOfYear::Aug),
+                "sep" => return Some(MonthOfYear::Sep),
+                "oct" => return Some(MonthOfYear::Oct),
+                "nov" => return Some(MonthOfYear::Nov),
+                "dec" => return Some(MonthOfYear::Dec),
+                _ => {}
+            }
         }
     }
-
-    Ok(None)
+    None
 }
 
 #[cfg(test)]
@@ -358,13 +375,12 @@ mod date_expr_tests {
         Recognizable,
     };
     //use chrono::NaiveDate;
+    use chrono::Weekday::{self, *};
 
     #[test]
     fn in_month_tests() {
         assert_recognize_in_month("06/05", Jun, 5);
-        assert_recognize_in_month("06-05", Jun, 5);
         assert_recognize_in_month("6/5", Jun, 5);
-        assert_recognize_in_month("6-5", Jun, 5);
         assert_recognize_in_month("6/15", Jun, 15);
         assert_recognize_in_month("12/15", Dec, 15);
         assert_recognize_in_month("12/6", Dec, 6);
@@ -388,32 +404,53 @@ mod date_expr_tests {
         assert_recognize_in_month("May 25", May, 25);
     }
 
-    // #[test]
-    // fn absolute_day_tests() {
-    //     assert_recognize_date("Mon", 6, 5);
-    // }
+    #[test]
+    fn in_n_days_tests() {
+        assert_in_n_days("Lunch in 6 days", 6);
+        assert_in_n_days("Lunch in 1 day", 1);
+        assert_in_n_days("Lunch in 300 days", 300);
+        // assert_in_n_days("Lunch in six days", 6);
+    }
+
+    #[test]
+    fn day_in_n_weeks() {
+        assert_day_in_n_weeks("next thursday", Thu, 1);
+        assert_day_in_n_weeks("last wed", Wed, -1);
+        assert_day_in_n_weeks("this monday", Mon, 0);
+    }
 
     fn assert_recognize_in_month(text: &str, expected_m: MonthOfYear, expected_d: u32) {
         assert_eq!(
             DateExpr::recognize(text),
-            Ok(Some(DateExpr::InMonth(expected_m, expected_d)))
+            Some(DateExpr::InMonth(expected_m, expected_d))
         )
     }
 
     fn assert_recognize_in_year(text: &str, m: u32, d: u32, y: i32) {
         assert_eq!(
             DateExpr::recognize(text),
-            Ok(Some(DateExpr::InYear(num_to_month(m).unwrap(), d, y)))
+            Some(DateExpr::InYear(num_to_month(m).unwrap(), d, y))
         )
+    }
+
+    fn assert_in_n_days(text: &str, n: u32) {
+        assert_eq!(DateExpr::recognize(text), Some(DateExpr::InNDays(n)))
+    }
+
+    fn assert_day_in_n_weeks(text: &str, d: Weekday, n: i8) {
+        assert_eq!(DateExpr::recognize(text), Some(DateExpr::DayInNWeeks(n, d)))
     }
 }
 
 mod month_expr_tests {
     use super::{
-        DayOfWeek::{self, *},
+        DateExpr,
+        // DayOfWeek::{self, *},
         MonthOfYear::{self, *},
         Recognizable,
     };
+
+    use chrono::Weekday::{self, *};
 
     // #[test]
     // fn absolute_month_tests() {
@@ -431,23 +468,25 @@ mod month_expr_tests {
     }
 
     #[test]
-    fn english_day_tests() {
-        assert_recognize_day("this tuesday", Tue);
-        assert_recognize_day("next wed", Wed);
-        assert_recognize_day("this saturday", Sat);
-        assert_recognize_day("sun after next", Sun);
+    fn relative_month_tests() {
+        assert_relative_month("in 4 months", 4);
+        assert_relative_month("in 1 month", 1);
     }
 
-    // #[test]
-    // fn absolute_day_tests() {
-    //     assert_recognize_date("Mon", 6, 5, 19);
-    // }
-
-    fn assert_recognize_day(text: &str, expected_d: DayOfWeek) {
-        assert_eq!(DayOfWeek::recognize(text), Ok(Some(expected_d)))
+    #[test]
+    fn next_month_tests() {
+        assert_relative_month("next month", 1);
+        assert_relative_month("this month", 0);
     }
 
     fn assert_recognize_month(text: &str, expected_m: MonthOfYear) {
-        assert_eq!(MonthOfYear::recognize(text), Ok(Some(expected_m)))
+        assert_eq!(MonthOfYear::recognize(text), Some(expected_m))
+    }
+
+    fn assert_relative_month(text: &str, expected_n: i32) {
+        assert_eq!(
+            DateExpr::recognize(text),
+            Some(DateExpr::InNMonths(expected_n))
+        )
     }
 }
