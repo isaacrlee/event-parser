@@ -267,7 +267,7 @@ fn event_property_line_to_date_value_str<'a>(s: &'a str, property: &str) -> &'a 
 #[cfg(test)]
 mod to_event_tests {
     use super::{event_property_line_to_ndt, summary, to_event};
-    use chrono::{Local, NaiveDate, NaiveDateTime};
+    use chrono::{Local, NaiveDate, NaiveDateTime, Duration, Weekday, prelude::*};
     use icalendar::Component;
     #[test]
     fn start_tests() {
@@ -281,9 +281,9 @@ mod to_event_tests {
         assert_to_event("Lunch at 12pm", time_today(12, 0, 0), time_today(13, 0, 0));
         assert_to_event("Dinner at 7pm", time_today(19, 0, 0), time_today(20, 0, 0));
         assert_to_event(
-            "Flight on saturday at noon",
-            time_and_date(12, 0, 0, 6, 15, 2019),
-            time_and_date(13, 0, 0, 6, 15, 2019),
+            "Flight at noon",
+            time_today(12, 0, 0),
+            time_today(13, 0, 0),
         );
     }
 
@@ -298,28 +298,28 @@ mod to_event_tests {
     fn starts_and_ends_with_date_tests() {
         assert_to_event(
             "Lunch 1-2pm 6/10",
-            time_and_date(13, 0, 0, 6, 10, 2019),
-            time_and_date(14, 0, 0, 6, 10, 2019),
+            time_and_date(13, 0, 0, 6, 10, 2020),
+            time_and_date(14, 0, 0, 6, 10, 2020),
         )
     }
 
     #[test]
     fn all_day_tests() {
-        assert_to_event_all_day("America's Birthday 7/4", ndt_from_ymd(2019, 7, 4));
-        assert_to_event_all_day("America's Birthday July 4th", ndt_from_ymd(2019, 7, 4));
+        assert_to_event_all_day("America's Birthday 7/4", ndt_from_ymd(2020, 7, 4));
+        assert_to_event_all_day("America's Birthday July 4th", ndt_from_ymd(2020, 7, 4));
     }
 
     #[test]
     fn start_with_date_tests() {
         assert_to_event(
             "Lunch at 1pm 6/15",
-            time_and_date(13, 0, 0, 6, 15, 2019),
-            time_and_date(14, 0, 0, 6, 15, 2019),
+            time_and_date(13, 0, 0, 6, 15, 2020),
+            time_and_date(14, 0, 0, 6, 15, 2020),
         );
         assert_to_event(
             "Lunch at 1pm next Friday",
-            time_and_date(13, 0, 0, 6, 21, 2019),
-            time_and_date(14, 0, 0, 6, 21, 2019),
+            date_for_friday(13, 0, true),
+            date_for_friday(14, 0, true),
         );
     }
 
@@ -327,8 +327,8 @@ mod to_event_tests {
     fn all_day_starts_and_ends_tests() {
         assert_to_event(
             "Welcome Week 9/1-9/8",
-            ndt_from_ymd(2019, 9, 1),
-            ndt_from_ymd(2019, 9, 8),
+            ndt_from_ymd(2020, 9, 1),
+            ndt_from_ymd(2020, 9, 8),
         )
     }
 
@@ -382,6 +382,34 @@ mod to_event_tests {
 
     fn time_and_date(h: u32, min: u32, s: u32, mon: u32, d: u32, y: i32) -> NaiveDateTime {
         NaiveDate::from_ymd(y, mon, d).and_hms(h, min, s)
+    }
+
+    fn date_for_friday(h: u32, m: u32, next: bool) -> NaiveDateTime {
+        let today_weekday = Local::now().weekday();
+        let today_num = today_weekday.number_from_monday() as i64;
+
+        let goal_num = Weekday::Fri.number_from_monday() as i64;
+
+        let diff = goal_num - today_num;
+        if diff > 0 {
+            let duration; 
+            if next {
+                duration = Duration::days(diff + 7);
+            } else {
+                duration = Duration::days(diff);
+            }
+            
+            return Local::today().and_hms(h, m, 0).naive_local() + duration;
+        } else {
+            let pos_diff = 7 + diff;
+            let duration;
+            if next {
+                duration = Duration::days(pos_diff + 7);
+            } else {
+                duration = Duration::days(pos_diff);
+            }
+            return Local::today().and_hms(h, m, 0).naive_local() + duration;
+        }
     }
 
     fn assert_to_event_all_day(input: &str, expected_start: NaiveDateTime) {

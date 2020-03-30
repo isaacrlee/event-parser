@@ -13,9 +13,9 @@ impl DateParser {
     /// use chrono::NaiveDate;
     /// use datetimeparser::{date_parse::DateParser, recognizable::Recognizable};
     ///
-    /// let date = DateParser::parse("July 4 2019");
+    /// let date = DateParser::parse("July 4 2020");
     ///
-    /// assert_eq!(date, Some(NaiveDate::from_ymd(2019, 7, 4)));
+    /// assert_eq!(date, Some(NaiveDate::from_ymd(2020, 7, 4)));
     /// ```
     pub fn parse(text: &str) -> Option<NaiveDate> {
         DateParser::parse_relative(text, Utc::now().date().naive_utc())
@@ -27,9 +27,9 @@ impl DateParser {
     /// use chrono::{NaiveDate, Utc};
     /// use datetimeparser::{date_parse::DateParser, recognizable::Recognizable};
     ///
-    /// let date = DateParser::parse_relative("July 4 2019", Utc::now().date().naive_utc());
+    /// let date = DateParser::parse_relative("July 4 2020", Utc::now().date().naive_utc());
     ///
-    /// assert_eq!(date, Some(NaiveDate::from_ymd(2019, 7, 4)));
+    /// assert_eq!(date, Some(NaiveDate::from_ymd(2020, 7, 4)));
     /// ```
     pub fn parse_relative(text: &str, now: NaiveDate) -> Option<NaiveDate> {
         if let Some(date_expr) = DateExpr::recognize(text) {
