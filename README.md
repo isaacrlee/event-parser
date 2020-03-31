@@ -51,5 +51,7 @@ cargo test
 ```
 
 ## License
-
-Distributed under the MIT license. See ``LICENSE`` for more information.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)  
+### The MIT License
+Distributed under the MIT license. See ``LICENSE`` for more information.  
+Copyright (c) 2020 Isaac Lee and Alex Grimes
