@@ -3,15 +3,26 @@ use regex::Regex;
 
 use crate::recognizable::Recognizable;
 
-/// A date parser for string slices.
+/// A struct used as the container for parsing dates from string slices.   
+///
+/// A client like `event_parser` can leverage the functions `parse` or `parse_relative` on `DateParser` to generate dates of type `NaiveDate`. In order to
+/// interpret a date based on the current date, use `parse` or to parse based on a custom date that is not today's date, use `parse_relative`.
+///
+/// Either function will return None if no match is found.
 pub struct DateParser {}
 
 impl DateParser {
-    /// Parses this string slice into an option containing a `NaiveDate`.
+    /// Parses a string slice of natural language text with respect to the current time. Returns a `NaiveDate` if a match is found, `None` otherwise.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - A string slice that holds the the text to be parsed
+    ///
     /// # Example
+    ///
     /// ```
     /// use chrono::NaiveDate;
-    /// use datetimeparser::{date_parse::DateParser, recognizable::Recognizable};
+    /// use date_time_parser::{date_parse::DateParser, recognizable::Recognizable};
     ///
     /// let date = DateParser::parse("July 4 2020");
     ///
@@ -21,11 +32,17 @@ impl DateParser {
         DateParser::parse_relative(text, Utc::now().date().naive_utc())
     }
 
-    /// Parses `text` into an option containing a `NaiveDate` relative to `now`.
+    /// Parses a string slice of natural language text with respect to a given time. Returns a `NaiveDate` if a match is found, `None` otherwise.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - A string slice that holds the the text to be parsed
+    /// * `now` - A `NaiveDate` to interpret the natural language date around
+    ///
     /// # Example
     /// ```
     /// use chrono::{NaiveDate, Utc};
-    /// use datetimeparser::{date_parse::DateParser, recognizable::Recognizable};
+    /// use date_time_parser::{date_parse::DateParser, recognizable::Recognizable};
     ///
     /// let date = DateParser::parse_relative("July 4 2020", Utc::now().date().naive_utc());
     ///
@@ -68,7 +85,7 @@ impl DateParser {
 }
 
 #[derive(Debug, PartialEq)]
-/// A year as defined by the Gregorian calendar i.e. AD 1 = Year(0).
+/// A year as defined by the Gregorian calendar i.e. AD 1 = Year(1).
 struct Year(pub isize);
 
 #[derive(Debug, PartialEq)]
@@ -108,7 +125,7 @@ fn num_to_month(num: u32) -> Option<MonthOfYear> {
 }
 
 #[derive(Debug, PartialEq)]
-// An abstract syntax for parsing dates.
+/// An abstract syntax for parsing dates.
 enum DateExpr {
     InNDays(i32),
     DayInNWeeks(i8, Weekday), // e.g. next week monday => DayInNWeeks(1, Mon)
@@ -438,6 +455,7 @@ mod date_expr_tests {
         assert_day_in_n_weeks("next thursday", Thu, 1);
         assert_day_in_n_weeks("last wed", Wed, -1);
         assert_day_in_n_weeks("this monday", Mon, 0);
+        assert_day_in_n_weeks("next friday", Fri, 1);
     }
 
     #[test]
@@ -491,20 +509,21 @@ mod date_expr_tests {
 
 mod month_of_year_tests {
     use super::{
-        MonthOfYear::{self, *},
+        MonthOfYear::{self},
         Recognizable,
     };
 
     #[test]
     fn english_month_tests() {
-        assert_recognize_month("summer in June", Jun);
-        assert_recognize_month("mother's day in May", May);
-        assert_recognize_month("back to school in August", Aug);
-        assert_recognize_month("Lunch w/Julie apr", Apr);
-        assert_recognize_month("octopus 8pm jul", Jul);
-        assert_recognize_month("julie 7 jul 5", Jul);
+        assert_recognize_month("summer in June", MonthOfYear::Jun);
+        assert_recognize_month("mother's day in May", MonthOfYear::May);
+        assert_recognize_month("back to school in August", MonthOfYear::Aug);
+        assert_recognize_month("Lunch w/Julie apr", MonthOfYear::Apr);
+        assert_recognize_month("octopus 8pm jul", MonthOfYear::Jul);
+        assert_recognize_month("julie 7 jul 5", MonthOfYear::Jul);
     }
 
+    #[allow(dead_code)]
     fn assert_recognize_month(text: &str, expected_m: MonthOfYear) {
         assert_eq!(MonthOfYear::recognize(text), Some(expected_m))
     }

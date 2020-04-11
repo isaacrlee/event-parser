@@ -6,15 +6,25 @@ use crate::recognizable::Recognizable;
 extern crate regex;
 
 #[derive(Default)]
-/// A time parser for string slices.
+/// A struct used as the container for parsing times from string slices.
+///
+/// A client like `event_parser` can leverage the functions `parse` or `parse_relative` on `TimeParser` to generate dates of type `NaiveTime`. In order to
+/// interpret a time based on the current time, use `parse`, or to parse based on a custom time that is not `now`, use `parse_relative`.
+///
+/// Either function will return None if no match is found.
 pub struct TimeParser {}
 
 impl TimeParser {
-    /// Parses this string slice into an option containing a `NaiveTime`.
+    /// Parses the string slice `text`, relative to the current time, into an option containing a `NaiveTime`. Returns `Some` if a match is found, `None` otherwise.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - A string slice that holds the the text to be parsed
+    ///
     /// # Example
     /// ```
     /// use chrono::NaiveTime;
-    /// use datetimeparser::{time_parse::TimeParser, recognizable::Recognizable};
+    /// use date_time_parser::{time_parse::TimeParser, recognizable::Recognizable};
     ///
     /// let time = TimeParser::parse("6:30pm");
     /// assert_eq!(time, Some(NaiveTime::from_hms(18, 30, 0)));
@@ -23,13 +33,21 @@ impl TimeParser {
         TimeParser::parse_relative(text, Utc::now().time())
     }
 
-    /// Parses this string slice into an option containing a `NaiveTime` relative to `now`.
+    /// Parses the string slice `text`, relative to `now`, into an option containing a `NaiveTime`. Returns `Some` if a match is found, `None` otherwise.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - A string slice that holds the the text to be parsed
+    /// * `now` - A `NaiveDate` to interpret the natural language date around
+    ///
     /// # Example
     /// ```
     /// use chrono::{NaiveTime, Utc};
-    /// use datetimeparser::{time_parse::TimeParser, recognizable::Recognizable};
+    /// use date_time_parser::{time_parse::TimeParser, recognizable::Recognizable};
+    ///
     /// let time = TimeParser::parse_relative("6:30pm", Utc::now().time());
     /// assert_eq!(time, Some(NaiveTime::from_hms(18, 30, 0)));
+    /// ```
     pub fn parse_relative(text: &str, now: NaiveTime) -> Option<NaiveTime> {
         if let Some(time_expr) = TimeExpr::recognize(text) {
             match time_expr {
@@ -102,7 +120,6 @@ fn parse_absolute_time(text: &str) -> Option<TimeExpr> {
             if meridiem_match.as_str().to_lowercase().contains('p') && hour != 12 {
                 hour += 12;
             } else {
-
             }
         } else {
             // doesn't contain am or pm, default is pm for 1-8 and am for 9-12

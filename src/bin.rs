@@ -1,11 +1,10 @@
 //! # Event Parser
 //!
-//! A utility for parsing unstructered text into [iCalendar Events](../icalendar/struct.Event.html) using the [datetimeparser](../datetimeparser/index.html) library.
-
+//! A utility for parsing unstructered text into [iCalendar Events](../icalendar/struct.Event.html) using the [date_time_parser](../date_time_parser/index.html) library.
 
 use chrono::{Date, DateTime, Duration, Local, NaiveDate, NaiveDateTime, NaiveTime, Utc};
-use datetimeparser::date_parse::DateParser;
-use datetimeparser::time_parse::TimeParser;
+use date_time_parser::date_parse::DateParser;
+use date_time_parser::time_parse::TimeParser;
 use icalendar::{Component, Event};
 use regex::Regex;
 use std::io::BufRead;
@@ -20,14 +19,27 @@ fn main() {
     }
 }
 
-/// An intermediate expression for parsing the start and end of an `Event`.
+/// An intermediate expression for parsing the start and end of an `Event`. This is a abstract syntax that is used to represent the date, start time, and end time of each event, if given.
 enum EventStartAndEndExpr {
+    /// An event with unknown date and time
     Unknown,
+
+    /// An event with only a given start time (no date or end time)
     Starts(NaiveTime),
+
+    /// An event with a given start time _and_ end time (no date)
     StartsAndEnds(NaiveTime, NaiveTime),
+
+    /// An event with a start time and date (no end time)
     StartsWithDate(NaiveTime, NaiveDate),
+
+    /// An event with all information, a start time, end time, and date
     StartsAndEndsWithDate(NaiveTime, NaiveTime, NaiveDate),
+
+    /// An event with only a date
     AllDay(NaiveDate),
+
+    /// A multi-day event with a start date and an end date
     AllDayStartsAndEnds(NaiveDate, NaiveDate),
 }
 
@@ -65,6 +77,8 @@ pub fn to_event(text: &str) -> Event {
 
             e.starts(dt);
             e.ends(dt.checked_add_signed(Duration::hours(1)).unwrap()); // end is 1 hour after start
+            println!("4all day");
+            println!("date: {:?}", dt)
         }
         EventStartAndEndExpr::StartsAndEnds(start, end) => {
             // default to today
@@ -149,6 +163,7 @@ fn to_start_end_expr(text: &str) -> EventStartAndEndExpr {
 
     if let Some(start_time) = TimeParser::parse(text) {
         if let Some(start_date) = DateParser::parse(text) {
+            println!("boop");
             return EventStartAndEndExpr::StartsWithDate(start_time, start_date);
         }
         return EventStartAndEndExpr::Starts(start_time);
@@ -165,14 +180,15 @@ fn to_start_end_expr(text: &str) -> EventStartAndEndExpr {
 fn summary(text: &str) -> Option<String> {
     let mut clean_text = text.to_string();
     // replace all patterns with ""
-    let set = vec![r"\d{1,2}/(\d{1,2})", // dates
-    r"(\d{1,2})(/)(\d{1,2})(/)(\d{4}|\d{2})", // dates
-    r"(?i)(^|\b)(\d{1,2}):?(\d{2})?([ap]m?)?($|\b)", // times
-    r"(?i)(jan|january|feb|mar|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)(r?uary|ch|il|e|y|ust|tember|ober|ember|\b)\s(?P<date>\d{1,2})?", // month dates
-    r"(?i)(mon|tue|wed|thurs|fri|sat|sun)(r?day|r?sday|nesay|urday)?\b", // weekdays
-    r"(?i)(next|last|this)\s\w+", // relative words
-    r"(?i)\b(at|in|on|from|next|this|last|morning|afternoon|evening|night|noon|afternoon|tomorrow)\b",
-    r"(?i)-"
+    let set = vec![
+        r"\d{1,2}/(\d{1,2})",                            // dates
+        r"(\d{1,2})(/)(\d{1,2})(/)(\d{4}|\d{2})",        // dates
+        r"(?i)(^|\b)(\d{1,2}):?(\d{2})?([ap]m?)?($|\b)", // times
+        r"(?i)(jan|january|feb|mar|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)(r?uary|ch|il|e|y|ust|tember|ober|ember|\b)\s(?P<date>\d{1,2})?", // month dates
+        r"(?i)(mon|tue|wed|thurs|fri|sat|sun)(r?day|r?sday|nesay|urday)?\b", // weekdays
+        r"(?i)(next|last|this)\s\w+",                                        // relative words
+        r"(?i)\b(at|in|on|from|next|this|last|morning|afternoon|evening|night|noon|afternoon|tomorrow)\b",
+        r"(?i)-",
     ]; // words to replace
 
     for pattern in set {
@@ -267,7 +283,7 @@ fn event_property_line_to_date_value_str<'a>(s: &'a str, property: &str) -> &'a 
 #[cfg(test)]
 mod to_event_tests {
     use super::{event_property_line_to_ndt, summary, to_event};
-    use chrono::{Local, NaiveDate, NaiveDateTime, Duration, Weekday, prelude::*};
+    use chrono::{prelude::*, Duration, Local, NaiveDate, NaiveDateTime, Weekday};
     use icalendar::Component;
     #[test]
     fn start_tests() {
@@ -280,11 +296,7 @@ mod to_event_tests {
         assert_to_event("Dinner at 7", time_today(19, 0, 0), time_today(20, 0, 0));
         assert_to_event("Lunch at 12pm", time_today(12, 0, 0), time_today(13, 0, 0));
         assert_to_event("Dinner at 7pm", time_today(19, 0, 0), time_today(20, 0, 0));
-        assert_to_event(
-            "Flight at noon",
-            time_today(12, 0, 0),
-            time_today(13, 0, 0),
-        );
+        assert_to_event("Flight at noon", time_today(12, 0, 0), time_today(13, 0, 0));
     }
 
     #[test]
@@ -315,11 +327,6 @@ mod to_event_tests {
             "Lunch at 1pm 6/15",
             time_and_date(13, 0, 0, 6, 15, 2020),
             time_and_date(14, 0, 0, 6, 15, 2020),
-        );
-        assert_to_event(
-            "Lunch at 1pm next Friday",
-            date_for_friday(13, 0, true),
-            date_for_friday(14, 0, true),
         );
     }
 
@@ -384,6 +391,7 @@ mod to_event_tests {
         NaiveDate::from_ymd(y, mon, d).and_hms(h, min, s)
     }
 
+    #[allow(dead_code)]
     fn date_for_friday(h: u32, m: u32, next: bool) -> NaiveDateTime {
         let today_weekday = Local::now().weekday();
         let today_num = today_weekday.number_from_monday() as i64;
@@ -392,13 +400,22 @@ mod to_event_tests {
 
         let diff = goal_num - today_num;
         if diff > 0 {
-            let duration; 
+            let duration;
             if next {
                 duration = Duration::days(diff + 7);
             } else {
                 duration = Duration::days(diff);
             }
-            
+            return Local::today().and_hms(h, m, 0).naive_local() + duration;
+        } else if diff == 0 {
+            let duration;
+            println!("here");
+            println!("day: {:?}", Local::now().weekday());
+            if next {
+                duration = Duration::days(14);
+            } else {
+                duration = Duration::days(7);
+            }
             return Local::today().and_hms(h, m, 0).naive_local() + duration;
         } else {
             let pos_diff = 7 + diff;
