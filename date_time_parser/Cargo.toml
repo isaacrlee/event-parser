@@ -1,0 +1,11 @@
+[package]
+name = "date_time_parser"
+version = "0.1.0"
+authors = ["Isaac Lee <isaacrlee@gmail.com>", "Alex Grimes <alexkgrimes@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+regex = "1"
+chrono = "0.4"

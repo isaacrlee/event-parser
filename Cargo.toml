@@ -1,18 +1,17 @@
 [package]
-name = "eventparser"
+name = "event_parser_command_line_tool"
 version = "0.1.0"
 authors = ["Isaac Lee <isaacrlee@gmail.com>", "Alex Grimes <alexkgrimes@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-chrono = "0.4"
-icalendar = "0.6.0"
-regex = "1"
-
-[lib]
-name = "date_time_parser"
-path = "src/lib.rs"
+event_parser = {path = "./event_parser"}
 
 [[bin]]
-name = "eventparser"
+name = "event_parser_command_line_tool"
 path = "src/bin.rs"
+
+[workspace]
+members = [
+    "event_parser"
+]
