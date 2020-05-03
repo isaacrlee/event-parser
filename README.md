@@ -1,7 +1,7 @@
 # Event Parser
 Natural language date, time and event parsing libraries for Rust
 
-![Build](https://github.com/isaacrlee/event-parser/workflows/Build/badge.svg)
+![Build](https://github.com/isaacrlee/event-parser/workflows/Build/badge.svg) ![crates.io](https://img.shields.io/badge/crates.io-v0.1.0-blue)
 
 Event Parser contains an date and time natural language parsing library, and event parsing library, as well as a client that demonstrates how to leverage these crates for a simple command-line tool. Written in Rust, the libraries build on the [`chrono`](https://docs.rs/chrono/0.4.11/chrono/) and [`regex`](https://docs.rs/regex/1.3.7/regex/) crates to deliver a library that provides more extensive coverage of natural language statements.
 
