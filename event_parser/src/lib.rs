@@ -409,34 +409,38 @@ mod to_event_tests {
 
     #[test]
     fn starts_and_ends_with_date_tests() {
+        let year = Local::now().year();
         assert_to_event(
             "Lunch 1-2pm 6/10",
-            time_and_date(13, 0, 0, 6, 10, 2020),
-            time_and_date(14, 0, 0, 6, 10, 2020),
+            time_and_date(13, 0, 0, 6, 10, year),
+            time_and_date(14, 0, 0, 6, 10, year),
         )
     }
 
     #[test]
     fn all_day_tests() {
-        assert_to_event_all_day("America's Birthday 7/4", ndt_from_ymd(2020, 7, 4));
-        assert_to_event_all_day("America's Birthday July 4th", ndt_from_ymd(2020, 7, 4));
+        let year = Local::now().year();
+        assert_to_event_all_day("America's Birthday 7/4", ndt_from_ymd(year, 7, 4));
+        assert_to_event_all_day("America's Birthday July 4th", ndt_from_ymd(year, 7, 4));
     }
 
     #[test]
     fn start_with_date_tests() {
+        let year = Local::now().year();
         assert_to_event(
             "Lunch at 1pm 6/15",
-            time_and_date(13, 0, 0, 6, 15, 2020),
-            time_and_date(14, 0, 0, 6, 15, 2020),
+            time_and_date(13, 0, 0, 6, 15, year),
+            time_and_date(14, 0, 0, 6, 15, year),
         );
     }
 
     #[test]
     fn all_day_starts_and_ends_tests() {
+        let year = Local::now().year();
         assert_to_event(
             "Welcome Week 9/1-9/8",
-            ndt_from_ymd(2020, 9, 1),
-            ndt_from_ymd(2020, 9, 8),
+            ndt_from_ymd(year, 9, 1),
+            ndt_from_ymd(year, 9, 8),
         )
     }
 
