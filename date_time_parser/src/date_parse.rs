@@ -67,7 +67,7 @@ impl DateParser {
                         - (now.weekday().num_days_from_sunday() as i32);
                     println!("Initial difference is {}", difference);
                     if difference < 0 {
-                        difference = 7 - difference;
+                        difference = 7 + difference;
                         println!("Adjusted difference is {}", difference);
                     }
                     difference += 7 * (n as i32);
