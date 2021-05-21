@@ -62,18 +62,13 @@ impl DateParser {
                     return Some(now.checked_add_signed(d).unwrap());
                 }
                 DateExpr::DayInNWeeks(n, d) => {
-                    println!("Found week day reference in {} relative to {}", text, now);
                     let mut difference: i32 = (d.num_days_from_sunday() as i32)
                         - (now.weekday().num_days_from_sunday() as i32);
-                    println!("Initial difference is {}", difference);
                     if difference < 0 {
                         difference = 7 + difference;
-                        println!("Adjusted difference is {}", difference);
                     }
                     difference += 7 * (n as i32);
-                    println!("After next/prev adjustment, difference is {}", difference);
                     let dur = Duration::days(difference as i64);
-                    println!("Duration is {} and computed date is {}", dur, now.checked_add_signed(dur).unwrap());
                     return Some(now.checked_add_signed(dur).unwrap());
                 }
                 DateExpr::InNMonths(n) => {
