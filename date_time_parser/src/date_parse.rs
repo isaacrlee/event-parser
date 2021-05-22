@@ -65,7 +65,7 @@ impl DateParser {
                     let mut difference: i32 = (d.num_days_from_sunday() as i32)
                         - (now.weekday().num_days_from_sunday() as i32);
                     if difference < 0 {
-                        difference = 7 - difference;
+                        difference = 7 + difference;
                     }
                     difference += 7 * (n as i32);
                     let dur = Duration::days(difference as i64);
