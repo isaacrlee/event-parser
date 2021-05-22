@@ -18,12 +18,13 @@ impl DateParser {
     /// # Example
     ///
     /// ```
-    /// use chrono::NaiveDate;
+    /// use chrono::{prelude::*, Duration, Local, NaiveDate, NaiveDateTime, Weekday};
     /// use date_time_parser::{DateParser, Recognizable};
     ///
+    /// let year = Local::now().year();
     /// let date = DateParser::parse("July 4 2020");
     ///
-    /// assert_eq!(date, Some(NaiveDate::from_ymd(2020, 7, 4)));
+    /// assert_eq!(date, Some(NaiveDate::from_ymd(year, 7, 4)));
     /// ```
     pub fn parse(text: &str) -> Option<NaiveDate> {
         DateParser::parse_relative(text, Utc::now().date().naive_utc())
@@ -39,12 +40,13 @@ impl DateParser {
     /// # Example
     /// 
     /// ```
-    /// use chrono::{NaiveDate, Utc};
+    /// use chrono::{prelude::*, Duration, Local, NaiveDate, NaiveDateTime, Weekday};
     /// use date_time_parser::{DateParser, Recognizable};
     ///
-    /// let date = DateParser::parse_relative("July 4 2020", Utc::now().date().naive_utc());
+    /// let year = Local::now().year();
+    /// let date = DateParser::parse_relative("July 4", Utc::now().date().naive_utc());
     ///
-    /// assert_eq!(date, Some(NaiveDate::from_ymd(2020, 7, 4)));
+    /// assert_eq!(date, Some(NaiveDate::from_ymd(year, 7, 4)));
     /// ```
     pub fn parse_relative(text: &str, now: NaiveDate) -> Option<NaiveDate> {
         if let Some(date_expr) = DateExpr::recognize(text) {
@@ -65,7 +67,7 @@ impl DateParser {
                     let mut difference: i32 = (d.num_days_from_sunday() as i32)
                         - (now.weekday().num_days_from_sunday() as i32);
                     if difference < 0 {
-                        difference = 7 + difference;
+                        difference += 7;
                     }
                     difference += 7 * (n as i32);
                     let dur = Duration::days(difference as i64);

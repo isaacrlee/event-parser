@@ -13,5 +13,6 @@ path = "src/bin.rs"
 
 [workspace]
 members = [
-    "event_parser"
+    "event_parser",
+    "date_time_parser"
 ]

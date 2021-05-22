@@ -22,10 +22,11 @@
 //! [`NaiveDate`](https://docs.rs/chrono/0.4.0/chrono/naive/struct.NaiveDate.html) format.
 //! ```
 //! use date_time_parser::DateParser;
-//! use chrono::NaiveDate;
+//! use chrono::{prelude::*, Duration, Local, NaiveDate, NaiveDateTime, Weekday};
 //!
 //! let date = DateParser::parse("Lunch on June 5th");
-//! assert_eq!(date, Some(NaiveDate::from_ymd(2020, 6, 5)));
+//! let year = Local::now().year();
+//! assert_eq!(date, Some(NaiveDate::from_ymd(year, 6, 5)));
 //! ```
 //!
 //! ## Example: Find a Time
