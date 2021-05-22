@@ -10,7 +10,8 @@ repository = "https://github.com/isaacrlee/event-parser"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-regex = "1"
+regex = "1.5.3"
 chrono = "0.4"
-icalendar = "0.6.0"
+icalendar = "0.10.0"
 date_time_parser = "0.1.0"
+iso8601 = "0.4.0"

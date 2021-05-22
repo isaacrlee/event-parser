@@ -24,9 +24,9 @@
 //! for the event, defaulting to the current day if no date is found. The event will also have a summary (the name of the event), if one is given.
 //! ```
 //! use event_parser::to_event;
-//! use chrono::{Duration, Local};
+//! use chrono::{Duration, Local, NaiveTime, NaiveDateTime, NaiveDate};
 //! use icalendar::{Component, Event};
-//! 
+//!
 //! # fn equal(actual: Event, expected: Event) -> bool {
 //! #     return true
 //! # }
@@ -34,8 +34,8 @@
 //! let event = to_event("Dinner at 7");
 //! let expected_event = Event::new()
 //!     .summary("Dinner")
-//!     .starts(Local::today().and_hms(19, 0, 0))
-//!     .ends(Local::today().and_hms(19, 0, 0) + Duration::hours(1))
+//!     .starts(Local::today().naive_local().and_hms(19, 0, 0))
+//!     .ends(Local::today().naive_local().and_hms(19, 0, 0) + Duration::hours(1))
 //!     .done();
 //! assert!(equal(event, expected_event));
 //! ```
@@ -59,8 +59,8 @@
 //! let event = to_event("4pm Doctor's Appointment tomorrow");
 //! let expected_event = Event::new()
 //!     .summary("Doctor's Appointment")
-//!     .starts(Local::today().and_hms(16, 0, 0) + Duration::days(1))
-//!     .ends(Local::today().and_hms(17, 0,0 ) + Duration::days(1))
+//!     .starts(Local::today().naive_local().and_hms(16, 0, 0) + Duration::days(1))
+//!     .ends(Local::today().naive_local().and_hms(17, 0,0 ) + Duration::days(1))
 //!     .done();
 //! assert!(equal(event, expected_event));
 //! ```
@@ -85,7 +85,7 @@
 //! ```
 //! 
 
-use chrono::{Date, DateTime, Duration, Local, NaiveDate, NaiveDateTime, NaiveTime, Utc};
+use chrono::{Date, DateTime, Duration, Local, NaiveDate, NaiveDateTime, NaiveTime, Utc, Weekday};
 use date_time_parser::DateParser;
 use date_time_parser::TimeParser;
 use icalendar::{Component, Event};
@@ -305,76 +305,68 @@ pub fn pretty_print(e: Event) {
     // if start exists
     //  look for end
 
-    if let Some(summary) = e.properties().get("SUMMARY") {
-        let mut summary_string = String::new();
-        summary.fmt_write(&mut summary_string).unwrap();
+    if e.properties().contains_key("SUMMARY") {
         println!(
             "Event: {:?}",
-            event_property_line_to_value_str(&summary_string, "SUMMARY")
+            e.properties().get("SUMMARY").unwrap().value()
         );
     }
 
-    if let Some(loc) = e.properties().get("LOCATION") {
-        let mut loc_string = String::new();
-        loc.fmt_write(&mut loc_string).unwrap();
+    if e.properties().contains_key("LOCATION") {
         println!(
             "Location: {:?}",
-            event_property_line_to_value_str(&loc_string, "LOCATION")
+            e.properties().get("LOCATION").unwrap().value()
         );
     }
 
-    if let Some(start) = e.properties().get("DTSTART") {
-        let mut start_string = String::new();
-
-        start.fmt_write(&mut start_string).unwrap();
-
-        let start_ndt = event_property_line_to_ndt(&start_string, "DTSTART").unwrap();
-        if let Some(end) = e.properties().get("DTEND") {
-            let mut end_string = String::new();
-            end.fmt_write(&mut end_string).unwrap();
-            if let Some(end_ndt) = event_property_line_to_ndt(&end_string, "DTEND") {
-                println!(
-                    "{} {} - {} {}",
-                    start_ndt.format("%I:%M%P"),
-                    start_ndt.format("%B %d %Y"),
-                    end_ndt.format("%I:%M%P"),
-                    end_ndt.format("%B %d %Y"),
-                );
-            }
+    if e.properties().contains_key("DTSTART") {
+        let start_ndt = convert_ical_datetime(&e, "DTSTART");
+        if e.properties().contains_key("DTEND") {
+            let end_ndt = convert_ical_datetime(&e, "DTEND");
+            println!(
+                "{} {} - {} {}",
+                start_ndt.format("%I:%M%P"),
+                start_ndt.format("%B %d %Y"),
+                end_ndt.format("%I:%M%P"),
+                end_ndt.format("%B %d %Y"),
+            );
         }
     }
 }
 
-/// Helper function for getting the value of an event's `property` and converting it to a `NaiveDateTime`.
-fn event_property_line_to_ndt(s: &str, property: &str) -> Option<NaiveDateTime> {
-    // TODO: Handle all day
-    match NaiveDateTime::parse_from_str(
-        event_property_line_to_value_str(s, property),
-        "%Y%m%dT%H%M%S",
-    ) {
-        Ok(res) => Some(res),
+fn convert_ical_datetime(e: &Event, key: &str) -> NaiveDateTime {
+    let value = e.properties().get(key).unwrap().value();
+
+    fn to_naive_date(date: iso8601::Date) -> NaiveDate {
+        match date {
+            iso8601::Date::YMD { year, month, day } => {
+                NaiveDate::from_ymd(year, month, day)
+            }
+            iso8601::Date::Week { year, ww, d } => {
+                let mut day = Weekday::Sun;
+                for _ in 0..d {
+                    day = day.succ();
+                }
+                NaiveDate::from_isoywd(year, ww, day)
+            }
+            iso8601::Date::Ordinal { year, ddd } => {
+                NaiveDate::from_yo(year, ddd)
+            }
+        }
+    }
+    match iso8601::datetime(value) {
+        Ok(dt) => {
+            NaiveDateTime::new(
+                to_naive_date(dt.date),
+                NaiveTime::from_hms(dt.time.hour, dt.time.minute, dt.time.second))
+        }
         Err(_) => {
-            match NaiveDate::parse_from_str(
-                event_property_line_to_date_value_str(s, property),
-                "%Y%m%d",
-            ) {
-                Ok(res) => Some(res.and_hms(0, 0, 0)),
-                Err(_) => None,
-            }
+            let date = iso8601::date(value).unwrap();
+            NaiveDateTime::new(
+                to_naive_date(date),
+                NaiveTime::from_hms(0, 0, 0))
         }
     }
-}
-
-/// Helper function for getting the value of an event's `property`.
-fn event_property_line_to_value_str<'a>(s: &'a str, property: &str) -> &'a str {
-    s.trim().get(property.len() + 1..).unwrap()
-}
-
-/// Helper function for getting the value of an event's `property` when value is a date.
-fn event_property_line_to_date_value_str<'a>(s: &'a str, property: &str) -> &'a str {
-    s.trim()
-        .get(property.len() + ";VALUE=DATE:".len()..)
-        .unwrap()
 }
 
 ///////////////////////////////
@@ -383,9 +375,8 @@ fn event_property_line_to_date_value_str<'a>(s: &'a str, property: &str) -> &'a 
 
 #[cfg(test)]
 mod to_event_tests {
-    use super::{event_property_line_to_ndt, summary, to_event};
+    use super::{summary, to_event, convert_ical_datetime};
     use chrono::{prelude::*, Duration, Local, NaiveDate, NaiveDateTime, Weekday};
-    use icalendar::Component;
     #[test]
     fn start_tests() {
         assert_to_event("Lunch at 1pm", time_today(13, 0, 0), time_today(14, 0, 0));
@@ -409,34 +400,38 @@ mod to_event_tests {
 
     #[test]
     fn starts_and_ends_with_date_tests() {
+        let year = Local::now().year();
         assert_to_event(
             "Lunch 1-2pm 6/10",
-            time_and_date(13, 0, 0, 6, 10, 2020),
-            time_and_date(14, 0, 0, 6, 10, 2020),
+            time_and_date(13, 0, 0, 6, 10, year),
+            time_and_date(14, 0, 0, 6, 10, year),
         )
     }
 
     #[test]
     fn all_day_tests() {
-        assert_to_event_all_day("America's Birthday 7/4", ndt_from_ymd(2020, 7, 4));
-        assert_to_event_all_day("America's Birthday July 4th", ndt_from_ymd(2020, 7, 4));
+        let year = Local::now().year();
+        assert_to_event_all_day("America's Birthday 7/4", ndt_from_ymd(year, 7, 4));
+        assert_to_event_all_day("America's Birthday July 4th", ndt_from_ymd(year, 7, 4));
     }
 
     #[test]
     fn start_with_date_tests() {
+        let year = Local::now().year();
         assert_to_event(
             "Lunch at 1pm 6/15",
-            time_and_date(13, 0, 0, 6, 15, 2020),
-            time_and_date(14, 0, 0, 6, 15, 2020),
+            time_and_date(13, 0, 0, 6, 15, year),
+            time_and_date(14, 0, 0, 6, 15, year),
         );
     }
 
     #[test]
     fn all_day_starts_and_ends_tests() {
+        let year = Local::now().year();
         assert_to_event(
             "Welcome Week 9/1-9/8",
-            ndt_from_ymd(2020, 9, 1),
-            ndt_from_ymd(2020, 9, 8),
+            ndt_from_ymd(year, 9, 1),
+            ndt_from_ymd(year, 9, 8),
         )
     }
 
@@ -532,12 +527,8 @@ mod to_event_tests {
     fn assert_to_event_all_day(input: &str, expected_start: NaiveDateTime) {
         let e = to_event(input);
 
-        let start = e.properties().get("DTSTART").unwrap();
-        let mut start_string = String::new();
-        start.fmt_write(&mut start_string).unwrap();
-
         assert_eq!(
-            event_property_line_to_ndt(&start_string, "DTSTART").unwrap(),
+            convert_ical_datetime(&e, "DTSTART"),
             expected_start
         );
     }
@@ -545,22 +536,16 @@ mod to_event_tests {
     fn assert_to_event(input: &str, expected_start: NaiveDateTime, expected_end: NaiveDateTime) {
         let e = to_event(input);
 
-        let start = e.properties().get("DTSTART").unwrap();
-        let end = e.properties().get("DTEND").unwrap();
-
-        let mut start_string = String::new();
-        start.fmt_write(&mut start_string).unwrap();
-
-        let mut end_string = String::new();
-        end.fmt_write(&mut end_string).unwrap();
+        let start = convert_ical_datetime(&e, "DTSTART");
+        let end = convert_ical_datetime(&e, "DTEND");
 
         assert_eq!(
-            event_property_line_to_ndt(&start_string, "DTSTART").unwrap(),
+            start,
             expected_start
         );
 
         assert_eq!(
-            event_property_line_to_ndt(&end_string, "DTEND").unwrap(),
+            end,
             expected_end
         );
     }
