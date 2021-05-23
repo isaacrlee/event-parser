@@ -1,11 +1,12 @@
 [package]
 name = "event_parser"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Isaac Lee <isaacrlee@gmail.com>", "Alex Grimes <alexkgrimes@gmail.com>"]
 edition = "2018"
 license = "MIT"
 description = "Rust NLP library for parsing English natural language into icalendar events"
 repository = "https://github.com/isaacrlee/event-parser"
+readme = "../README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -13,5 +14,5 @@ repository = "https://github.com/isaacrlee/event-parser"
 regex = "1.5.3"
 chrono = "0.4"
 icalendar = "0.10.0"
-date_time_parser = "0.1.0"
+date_time_parser = "0.1.1"
 iso8601 = "0.4.0"
