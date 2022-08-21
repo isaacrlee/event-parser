@@ -125,7 +125,7 @@ fn parse_absolute_time(text: &str) -> Option<TimeExpr> {
             }
         }
 
-        return Some(TimeExpr::Absolute(NaiveTime::from_hms(hour, minute, 0)));
+        return Some(TimeExpr::Absolute(NaiveTime::from_hms_opt(hour, minute, 0)?));
     }
 
     None
@@ -150,7 +150,7 @@ fn parse_casual_time(text: &str) -> Option<TimeExpr> {
         // println!("match: {:?}", re.find(&text));
         if re.find(&text).is_some() {
             // println!("hour: {}", hours[i]);
-            return Some(TimeExpr::Absolute(NaiveTime::from_hms(hours[i], 0, 0)));
+            return Some(TimeExpr::Absolute(NaiveTime::from_hms_opt(hours[i], 0, 0)?));
         }
     }
 
@@ -245,9 +245,9 @@ mod time_expr_tests {
     fn assert_recognize_time(text: &str, expected_h: u32, expected_m: u32) {
         assert_eq!(
             TimeExpr::recognize(text),
-            Some(TimeExpr::Absolute(NaiveTime::from_hms(
+            Some(TimeExpr::Absolute(NaiveTime::from_hms_opt(
                 expected_h, expected_m, 0
-            )))
+            )?))
         )
     }
 
