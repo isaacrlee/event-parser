@@ -125,7 +125,9 @@ fn parse_absolute_time(text: &str) -> Option<TimeExpr> {
             }
         }
 
-        return Some(TimeExpr::Absolute(NaiveTime::from_hms_opt(hour, minute, 0)?));
+        return Some(TimeExpr::Absolute(NaiveTime::from_hms_opt(
+            hour, minute, 0,
+        )?));
     }
 
     None
@@ -242,12 +244,19 @@ mod time_expr_tests {
         assert_in_hours_time("in 1 hour", 1);
     }
 
+    #[test]
+    fn invalid_time_tests() {
+        assert_eq!(TimeExpr::recognize(""), None);
+        assert_eq!(TimeExpr::recognize("24"), None);
+        assert_eq!(TimeExpr::recognize("99:99"), None);
+    }
+
     fn assert_recognize_time(text: &str, expected_h: u32, expected_m: u32) {
         assert_eq!(
             TimeExpr::recognize(text),
-            Some(TimeExpr::Absolute(NaiveTime::from_hms_opt(
+            Some(TimeExpr::Absolute(NaiveTime::from_hms(
                 expected_h, expected_m, 0
-            )?))
+            )))
         )
     }
 
