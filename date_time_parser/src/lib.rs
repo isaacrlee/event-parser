@@ -53,8 +53,8 @@
 //! ```
 
 mod date_parse;
-mod time_parse;
 mod recognizable;
+mod time_parse;
 pub use date_parse::DateParser;
 pub use recognizable::Recognizable;
 pub use time_parse::TimeParser;

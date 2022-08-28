@@ -38,7 +38,7 @@ impl DateParser {
     /// * `now` - A [`NaiveDate`](https://docs.rs/chrono/0.4.0/chrono/naive/struct.NaiveDate.html) to interpret the natural language date around
     ///
     /// # Example
-    /// 
+    ///
     /// ```
     /// use chrono::{prelude::*, Duration, Local, NaiveDate, NaiveDateTime, Weekday};
     /// use date_time_parser::{DateParser, Recognizable};
