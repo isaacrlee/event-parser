@@ -171,7 +171,6 @@ pub fn to_event(text: &str) -> Event {
 
             e.starts(dt);
             e.ends(dt.checked_add_signed(Duration::hours(1)).unwrap()); // end is 1 hour after start
-            println!("date: {:?}", dt)
         }
         EventStartAndEndExpr::StartsAndEnds(start, end) => {
             // default to today
